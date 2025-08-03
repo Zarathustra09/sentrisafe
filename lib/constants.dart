@@ -1,5 +1,6 @@
 // lib/constants.dart
 import 'package:flutter/material.dart';
+import 'package:form_field_validator/form_field_validator.dart';
 
 class AppColors {
   // Primary Colors
@@ -86,4 +87,23 @@ class AppConstants {
   static const Duration animationMedium = Duration(milliseconds: 400);
   static const Duration animationSlow = Duration(milliseconds: 800);
   static const Duration animationVerySlow = Duration(milliseconds: 1200);
+
+  // Form Validation Constants
+  static const double defaultPadding = 16.0;
+  static const double defaultBorderRadious = 12.0;
+  static const Duration defaultDuration = Duration(milliseconds: 300);
+  static const String pasNotMatchErrorText = "passwords do not match";
 }
+
+// Form Validators
+final passwordValidator = MultiValidator([
+  RequiredValidator(errorText: 'Password is required'),
+  MinLengthValidator(8, errorText: 'password must be at least 8 digits long'),
+  PatternValidator(r'(?=.*?[#?!@$%^&*-])',
+      errorText: 'passwords must have at least one special character')
+]);
+
+final emaildValidator = MultiValidator([
+  RequiredValidator(errorText: 'Email is required'),
+  EmailValidator(errorText: "Enter a valid email address"),
+]);

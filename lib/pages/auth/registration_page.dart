@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:form_field_validator/form_field_validator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../constants.dart';
 import '../../route/route_constant.dart';
-import 'dart:async';
 
 class RegistrationPage extends StatefulWidget {
   RegistrationPage({super.key});
@@ -14,7 +14,16 @@ class RegistrationPage extends StatefulWidget {
 
 class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _retypePasswordController = TextEditingController();
   File? _idImage;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _retypePasswordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -24,6 +33,16 @@ class _RegistrationPageState extends State<RegistrationPage> {
         _idImage = File(pickedFile.path);
       });
     }
+  }
+
+  String? _validateRetypePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please retype your password';
+    }
+    if (value != _passwordController.text) {
+      return AppConstants.pasNotMatchErrorText;
+    }
+    return null;
   }
 
   @override
@@ -88,7 +107,27 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             hintStyle: TextStyle(color: AppColors.textHint),
                           ),
                           style: const TextStyle(color: AppColors.textPrimary),
+                          validator: RequiredValidator(errorText: 'Name is required').call,
                           onSaved: (name) {},
+                        ),
+                        SizedBox(height: AppConstants.spacingM),
+                        TextFormField(
+                          decoration: InputDecoration(
+                            hintText: 'Email',
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                            border: const OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                            ),
+                            hintStyle: TextStyle(color: AppColors.textHint),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          validator: emaildValidator.call,
+                          onSaved: (email) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
@@ -106,10 +145,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           ),
                           keyboardType: TextInputType.phone,
                           style: const TextStyle(color: AppColors.textPrimary),
+                          validator: RequiredValidator(errorText: 'Phone is required').call,
                           onSaved: (phone) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
+                          controller: _passwordController,
                           obscureText: true,
                           decoration: InputDecoration(
                             hintText: 'Password',
@@ -124,7 +165,28 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             hintStyle: TextStyle(color: AppColors.textHint),
                           ),
                           style: const TextStyle(color: AppColors.textPrimary),
+                          validator: passwordValidator.call,
                           onSaved: (password) {},
+                        ),
+                        SizedBox(height: AppConstants.spacingM),
+                        TextFormField(
+                          controller: _retypePasswordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            hintText: 'Retype Password',
+                            filled: true,
+                            fillColor: AppColors.surface,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                            border: const OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                            ),
+                            hintStyle: TextStyle(color: AppColors.textHint),
+                          ),
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          validator: _validateRetypePassword,
+                          onSaved: (retypePassword) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         // Valid ID Image Upload Field
