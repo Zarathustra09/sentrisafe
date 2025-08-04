@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:form_field_validator/form_field_validator.dart';
 
-class AppColors {
+class Constants {
   // Primary Colors
   static const Color primary = Color(0xFF00BCD4); // Teal/Cyan
   static const Color primaryDark = Color(0xFF00ACC1);
@@ -107,3 +107,7 @@ final emaildValidator = MultiValidator([
   RequiredValidator(errorText: 'Email is required'),
   EmailValidator(errorText: "Enter a valid email address"),
 ]);
+
+
+
+const String baseUrl = 'http://192.168.100.242/api';

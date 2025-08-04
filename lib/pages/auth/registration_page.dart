@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../constants.dart';
 import '../../route/route_constant.dart';
+import '../../services/auth/auth_service.dart';
 
 class RegistrationPage extends StatefulWidget {
   RegistrationPage({super.key});
@@ -14,12 +15,19 @@ class RegistrationPage extends StatefulWidget {
 
 class _RegistrationPageState extends State<RegistrationPage> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _retypePasswordController = TextEditingController();
   File? _idImage;
+  bool _isLoading = false;
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _retypePasswordController.dispose();
     super.dispose();
@@ -45,10 +53,59 @@ class _RegistrationPageState extends State<RegistrationPage> {
     return null;
   }
 
+  Future<void> _register() async {
+    if (_formKey.currentState!.validate() && _idImage != null) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final result = await AuthService.register(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        passwordConfirmation: _retypePasswordController.text,
+        idImage: _idImage!,
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (result['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration successful!'),
+            backgroundColor: Constants.success,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, loginScreenRoute);
+      } else {
+        final errors = result['errors'] as Map<String, dynamic>;
+        String errorMessage = errors.values.first.toString();
+        if (errors.values.first is List) {
+          errorMessage = (errors.values.first as List).first.toString();
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Constants.error,
+          ),
+        );
+      }
+    } else if (_idImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a valid ID image'),
+          backgroundColor: Constants.error,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.secondary,
+      backgroundColor: Constants.secondary,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -61,11 +118,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: AppColors.white,
+                      color: Constants.white,
                       borderRadius: BorderRadius.circular(AppConstants.radiusL),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.black.withOpacity(0.1),
+                          color: Constants.black.withOpacity(0.1),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -74,7 +131,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     child: const Icon(
                       Icons.shield_outlined,
                       size: 60,
-                      color: AppColors.primary,
+                      color: Constants.primary,
                     ),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.08),
@@ -85,7 +142,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         .headlineSmall!
                         .copyWith(
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: Constants.textPrimary,
                         ),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.04),
@@ -94,59 +151,59 @@ class _RegistrationPageState extends State<RegistrationPage> {
                     child: Column(
                       children: [
                         TextFormField(
+                          controller: _nameController,
                           decoration: InputDecoration(
                             hintText: 'Name',
                             filled: true,
-                            fillColor: AppColors.surface,
+                            fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
                               borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
                             ),
-                            hintStyle: TextStyle(color: AppColors.textHint),
+                            hintStyle: TextStyle(color: Constants.textHint),
                           ),
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: const TextStyle(color: Constants.textPrimary),
                           validator: RequiredValidator(errorText: 'Name is required').call,
-                          onSaved: (name) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
+                          controller: _emailController,
                           decoration: InputDecoration(
                             hintText: 'Email',
                             filled: true,
-                            fillColor: AppColors.surface,
+                            fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
                               borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
                             ),
-                            hintStyle: TextStyle(color: AppColors.textHint),
+                            hintStyle: TextStyle(color: Constants.textHint),
                           ),
                           keyboardType: TextInputType.emailAddress,
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: const TextStyle(color: Constants.textPrimary),
                           validator: emaildValidator.call,
-                          onSaved: (email) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
+                          controller: _phoneController,
                           decoration: InputDecoration(
                             hintText: 'Phone',
                             filled: true,
-                            fillColor: AppColors.surface,
+                            fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
                               borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
                             ),
-                            hintStyle: TextStyle(color: AppColors.textHint),
+                            hintStyle: TextStyle(color: Constants.textHint),
                           ),
                           keyboardType: TextInputType.phone,
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: const TextStyle(color: Constants.textPrimary),
                           validator: RequiredValidator(errorText: 'Phone is required').call,
-                          onSaved: (phone) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
@@ -155,18 +212,17 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           decoration: InputDecoration(
                             hintText: 'Password',
                             filled: true,
-                            fillColor: AppColors.surface,
+                            fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
                               borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
                             ),
-                            hintStyle: TextStyle(color: AppColors.textHint),
+                            hintStyle: TextStyle(color: Constants.textHint),
                           ),
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: const TextStyle(color: Constants.textPrimary),
                           validator: passwordValidator.call,
-                          onSaved: (password) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
@@ -175,24 +231,23 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           decoration: InputDecoration(
                             hintText: 'Retype Password',
                             filled: true,
-                            fillColor: AppColors.surface,
+                            fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
                               borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
                             ),
-                            hintStyle: TextStyle(color: AppColors.textHint),
+                            hintStyle: TextStyle(color: Constants.textHint),
                           ),
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          style: const TextStyle(color: Constants.textPrimary),
                           validator: _validateRetypePassword,
-                          onSaved: (retypePassword) {},
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         // Valid ID Image Upload Field
                         Container(
                           decoration: BoxDecoration(
-                            color: AppColors.surface,
+                            color: Constants.surface,
                             borderRadius: BorderRadius.circular(AppConstants.radiusXL),
                           ),
                           child: InkWell(
@@ -206,7 +261,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 children: [
                                   Icon(
                                     Icons.camera_alt,
-                                    color: _idImage == null ? AppColors.textHint : AppColors.primary,
+                                    color: _idImage == null ? Constants.textHint : Constants.primary,
                                     size: 24,
                                   ),
                                   SizedBox(width: AppConstants.spacingM),
@@ -214,7 +269,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                     child: Text(
                                       _idImage == null ? 'Valid ID' : 'ID Image Selected',
                                       style: TextStyle(
-                                        color: _idImage == null ? AppColors.textHint : AppColors.primary,
+                                        color: _idImage == null ? Constants.textHint : Constants.primary,
                                         fontSize: 16,
                                       ),
                                     ),
@@ -238,20 +293,24 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         ),
                         SizedBox(height: AppConstants.spacingL),
                         ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              _formKey.currentState!.save();
-                              // Registration logic here, including _idImage
-                            }
-                          },
+                          onPressed: _isLoading ? null : _register,
                           style: ElevatedButton.styleFrom(
                             elevation: AppConstants.elevationM,
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.white,
+                            backgroundColor: Constants.primary,
+                            foregroundColor: Constants.white,
                             minimumSize: const Size(double.infinity, 48),
                             shape: const StadiumBorder(),
                           ),
-                          child: const Text("Sign Up"),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Constants.white),
+                                  ),
+                                )
+                              : const Text("Sign Up"),
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextButton(
@@ -264,7 +323,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                               children: [
                                 TextSpan(
                                   text: "Sign In",
-                                  style: TextStyle(color: AppColors.primary),
+                                  style: TextStyle(color: Constants.primary),
                                 ),
                               ],
                             ),
@@ -272,7 +331,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 .textTheme
                                 .bodyMedium!
                                 .copyWith(
-                                  color: AppColors.textSecondary,
+                                  color: Constants.textSecondary,
                                 ),
                           ),
                         ),

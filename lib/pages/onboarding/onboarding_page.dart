@@ -69,7 +69,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: AppColors.primaryGradient,
+            colors: Constants.primaryGradient,
             stops: [0.0, 0.6],
           ),
         ),
@@ -81,7 +81,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               child: Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
-                  color: AppColors.primary,
+                  color: Constants.primary,
                 ),
                 child: SafeArea(
                   bottom: false,
@@ -100,11 +100,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               width: 120,
                               height: 120,
                               decoration: BoxDecoration(
-                                color: AppColors.white,
+                                color: Constants.white,
                                 borderRadius: BorderRadius.circular(AppConstants.radiusL),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.black.withOpacity(0.1),
+                                    color: Constants.black.withOpacity(0.1),
                                     blurRadius: 20,
                                     offset: const Offset(0, 10),
                                   ),
@@ -113,7 +113,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               child: const Icon(
                                 Icons.shield_outlined,
                                 size: 60,
-                                color: AppColors.primary,
+                                color: Constants.primary,
                               ),
                             ),
                           ),
@@ -133,7 +133,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               child: Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
-                  color: AppColors.secondary,
+                  color: Constants.secondary,
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(AppConstants.radiusXL),
                     topRight: Radius.circular(AppConstants.radiusXL),
@@ -157,7 +157,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               style: TextStyle(
                                 fontSize: 32,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                                color: Constants.textPrimary,
                                 letterSpacing: 2.0,
                               ),
                             ),
@@ -176,7 +176,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16,
-                                color: AppColors.textSecondary,
+                                color: Constants.textSecondary,
                                 height: 1.5,
                               ),
                             ),
@@ -198,10 +198,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                   Navigator.pushNamed(context, loginScreenRoute);
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: AppColors.white,
+                                  backgroundColor: Constants.primary,
+                                  foregroundColor: Constants.white,
                                   elevation: AppConstants.elevationM,
-                                  shadowColor: AppColors.primary.withOpacity(0.3),
+                                  shadowColor: Constants.primary.withOpacity(0.3),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(AppConstants.radiusXL),
                                   ),
@@ -232,7 +232,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                 Text(
                                   "Don't have account? ",
                                   style: TextStyle(
-                                    color: AppColors.textSecondary,
+                                    color: Constants.textSecondary,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -241,7 +241,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                     Navigator.pushNamed(context, registerScreenRoute);
                                   },
                                   style: TextButton.styleFrom(
-                                    foregroundColor: AppColors.primary,
+                                    foregroundColor: Constants.primary,
                                     padding: EdgeInsets.symmetric(
                                       horizontal: AppConstants.spacingS,
                                       vertical: AppConstants.spacingXS,
