@@ -41,11 +41,7 @@ class AuthService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
-        return {
-          'success': true,
-          'token': data['token'],
-          'user': data['user'],
-        };
+        return {'success': true, 'token': data['token'], 'user': data['user']};
       } else {
         return {
           'success': false,
@@ -60,7 +56,6 @@ class AuthService {
     }
   }
 
-
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -72,10 +67,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
+        body: jsonEncode({'email': email, 'password': password}),
       );
 
       print('Login response: ${response.body}');
@@ -89,16 +81,10 @@ class AuthService {
           'user_id': data['user_id'],
         };
       } else {
-        return {
-          'success': false,
-          'error': data['error'] ?? 'Login failed',
-        };
+        return {'success': false, 'error': data['error'] ?? 'Login failed'};
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}',
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 }
