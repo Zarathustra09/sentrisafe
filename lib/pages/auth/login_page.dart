@@ -46,8 +46,7 @@ class _LoginPageState extends State<LoginPage> {
             backgroundColor: Constants.success,
           ),
         );
-        // Navigate to main screen - replace with your route
-        // Navigator.pushReplacementNamed(context, mainScreenRoute);
+        Navigator.pushReplacementNamed(context, homeScreenRoute);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

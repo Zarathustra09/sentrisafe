@@ -1,32 +1,263 @@
 import 'package:flutter/material.dart';
 import 'widgets/top_navbar.dart';
 import 'widgets/bottom_navbar.dart';
+import 'constants.dart';
 
-class EntryPointPage extends StatelessWidget {
+class EntryPointPage extends StatefulWidget {
   const EntryPointPage({Key? key}) : super(key: key);
+
+  @override
+  State<EntryPointPage> createState() => _EntryPointPageState();
+}
+
+class _EntryPointPageState extends State<EntryPointPage> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _pages = [
+    _buildHomePage(),
+    _buildMapPage(),
+    _buildReportPage(),
+    _buildDiscussionPage(),
+  ];
+
+  static Widget _buildHomePage() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spacingM),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppConstants.spacingXL),
+              decoration: BoxDecoration(
+                color: Constants.surface,
+                borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                boxShadow: [
+                  BoxShadow(
+                    color: Constants.black.withOpacity(0.1),
+                    blurRadius: AppConstants.elevationL,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.home_outlined,
+                    size: 48,
+                    color: Constants.primary,
+                  ),
+                  const SizedBox(height: AppConstants.spacingM),
+                  Text(
+                    'Welcome Home',
+                    style: TextStyle(
+                      color: Constants.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.spacingS),
+                  Text(
+                    'Your dashboard content goes here',
+                    style: TextStyle(
+                      color: Constants.textSecondary,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildMapPage() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spacingM),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppConstants.spacingXL),
+              decoration: BoxDecoration(
+                color: Constants.surface,
+                borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                boxShadow: [
+                  BoxShadow(
+                    color: Constants.black.withOpacity(0.1),
+                    blurRadius: AppConstants.elevationL,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.map_outlined,
+                    size: 48,
+                    color: Constants.primary,
+                  ),
+                  const SizedBox(height: AppConstants.spacingM),
+                  Text(
+                    'Interactive Map',
+                    style: TextStyle(
+                      color: Constants.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.spacingS),
+                  Text(
+                    'Map functionality will be implemented here',
+                    style: TextStyle(
+                      color: Constants.textSecondary,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildReportPage() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spacingM),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppConstants.spacingXL),
+              decoration: BoxDecoration(
+                color: Constants.surface,
+                borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                boxShadow: [
+                  BoxShadow(
+                    color: Constants.black.withOpacity(0.1),
+                    blurRadius: AppConstants.elevationL,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.report_outlined,
+                    size: 48,
+                    color: Constants.warning,
+                  ),
+                  const SizedBox(height: AppConstants.spacingM),
+                  Text(
+                    'Report Incidents',
+                    style: TextStyle(
+                      color: Constants.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.spacingS),
+                  Text(
+                    'Report safety incidents and concerns here',
+                    style: TextStyle(
+                      color: Constants.textSecondary,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _buildDiscussionPage() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spacingM),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppConstants.spacingXL),
+              decoration: BoxDecoration(
+                color: Constants.surface,
+                borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                boxShadow: [
+                  BoxShadow(
+                    color: Constants.black.withOpacity(0.1),
+                    blurRadius: AppConstants.elevationL,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.forum_outlined,
+                    size: 48,
+                    color: Constants.accent,
+                  ),
+                  const SizedBox(height: AppConstants.spacingM),
+                  Text(
+                    'Community Discussion',
+                    style: TextStyle(
+                      color: Constants.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppConstants.spacingS),
+                  Text(
+                    'Join community discussions and forums',
+                    style: TextStyle(
+                      color: Constants.textSecondary,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onTabChanged(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Constants.background,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(60),
+        preferredSize: const Size.fromHeight(60),
         child: TopNavbar(),
       ),
-      body: Center(
-        child: Container(
-          margin: const EdgeInsets.all(16.0),
-          height: 400,
-          width: double.infinity,
-          color: Colors.grey[300],
-          child: const Center(
-            child: Text(
-              'Map Placeholder',
-              style: TextStyle(fontSize: 24, color: Colors.black54),
-            ),
-          ),
-        ),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _pages,
       ),
-      bottomNavigationBar: BottomNavbar(),
+      bottomNavigationBar: BottomNavbar(
+        initialIndex: _selectedIndex,
+        onTabChanged: _onTabChanged,
+      ),
     );
   }
 }
