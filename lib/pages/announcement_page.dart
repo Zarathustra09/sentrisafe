@@ -84,7 +84,26 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   Future<void> _refreshAnnouncements() async {
+    // Reset pagination and reload from first page
+    setState(() {
+      currentPage = 1;
+      lastPage = 1;
+      hasError = false;
+      errorMessage = '';
+    });
+
     await _loadAnnouncements();
+
+    // Show success message after refresh
+    if (mounted && !hasError) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Announcements refreshed'),
+          backgroundColor: Constants.success,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   @override
@@ -93,6 +112,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       onRefresh: _refreshAnnouncements,
       color: Constants.primary,
       backgroundColor: Constants.surface,
+      strokeWidth: 3,
+      displacement: 50,
       child: _buildBody(),
     );
   }
@@ -114,140 +135,158 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            color: Constants.primary,
+    return ListView(
+      physics: AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.4),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                color: Constants.primary,
+              ),
+              const SizedBox(height: AppConstants.spacingM),
+              Text(
+                'Loading announcements...',
+                style: TextStyle(
+                  color: Constants.textSecondary,
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: AppConstants.spacingM),
-          Text(
-            'Loading announcements...',
-            style: TextStyle(
-              color: Constants.textSecondary,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.spacingL),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spacingXL),
-              decoration: BoxDecoration(
-                color: Constants.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                boxShadow: [
-                  BoxShadow(
-                    color: Constants.black.withOpacity(0.1),
-                    blurRadius: AppConstants.elevationL,
-                    offset: const Offset(0, 4),
+    return ListView(
+      physics: AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.spacingL),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppConstants.spacingXL),
+                  decoration: BoxDecoration(
+                    color: Constants.surface,
+                    borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Constants.black.withOpacity(0.1),
+                        blurRadius: AppConstants.elevationL,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: Constants.error,
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Constants.error,
+                      ),
+                      const SizedBox(height: AppConstants.spacingM),
+                      Text(
+                        'Error Loading Announcements',
+                        style: TextStyle(
+                          color: Constants.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.spacingS),
+                      Text(
+                        errorMessage,
+                        style: TextStyle(
+                          color: Constants.textSecondary,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppConstants.spacingL),
+                      ElevatedButton(
+                        onPressed: _loadAnnouncements,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Constants.primary,
+                          foregroundColor: Constants.white,
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: AppConstants.spacingM),
-                  Text(
-                    'Error Loading Announcements',
-                    style: TextStyle(
-                      color: Constants.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spacingS),
-                  Text(
-                    errorMessage,
-                    style: TextStyle(
-                      color: Constants.textSecondary,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppConstants.spacingL),
-                  ElevatedButton(
-                    onPressed: _loadAnnouncements,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Constants.primary,
-                      foregroundColor: Constants.white,
-                    ),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.spacingL),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spacingXL),
-              decoration: BoxDecoration(
-                color: Constants.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                boxShadow: [
-                  BoxShadow(
-                    color: Constants.black.withOpacity(0.1),
-                    blurRadius: AppConstants.elevationL,
-                    offset: const Offset(0, 4),
+    return ListView(
+      physics: AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppConstants.spacingL),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppConstants.spacingXL),
+                  decoration: BoxDecoration(
+                    color: Constants.surface,
+                    borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Constants.black.withOpacity(0.1),
+                        blurRadius: AppConstants.elevationL,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.announcement_outlined,
-                    size: 48,
-                    color: Constants.accent,
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.announcement_outlined,
+                        size: 48,
+                        color: Constants.accent,
+                      ),
+                      const SizedBox(height: AppConstants.spacingM),
+                      Text(
+                        'No Announcements',
+                        style: TextStyle(
+                          color: Constants.textPrimary,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: AppConstants.spacingS),
+                      Text(
+                        'Pull down to refresh and check for new announcements',
+                        style: TextStyle(
+                          color: Constants.textSecondary,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: AppConstants.spacingM),
-                  Text(
-                    'No Announcements',
-                    style: TextStyle(
-                      color: Constants.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spacingS),
-                  Text(
-                    'There are no announcements available at the moment',
-                    style: TextStyle(
-                      color: Constants.textSecondary,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -272,12 +311,21 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              Spacer(),
+              Text(
+                '${announcements.length} item${announcements.length != 1 ? 's' : ''}',
+                style: TextStyle(
+                  color: Constants.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
+            physics: AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
             itemCount: announcements.length + (isLoadingMore ? 1 : 0),
             itemBuilder: (context, index) {
