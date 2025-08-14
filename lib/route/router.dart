@@ -4,7 +4,7 @@ import 'screen_export.dart';
 import '../entry_point.dart';
 import '../pages/map_page.dart';
 import '../pages/report_page.dart';
-import '../pages/discussion_page.dart';
+import '../pages/announcement_page.dart';
 
 Route<dynamic> generateRoute(RouteSettings settings) {
   switch (settings.name) {
@@ -21,7 +21,7 @@ Route<dynamic> generateRoute(RouteSettings settings) {
     case reportScreenRoute:
       return MaterialPageRoute(builder: (context) => const ReportPage());
     case discussionScreenRoute:
-      return MaterialPageRoute(builder: (context) => const DiscussionPage());
+      return MaterialPageRoute(builder: (context) => const AnnouncementPage());
     default:
       return MaterialPageRoute(builder: (context) => const OnboardingScreen());
   }

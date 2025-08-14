@@ -108,6 +108,5 @@ final emaildValidator = MultiValidator([
   EmailValidator(errorText: "Enter a valid email address"),
 ]);
 
-
-
 const String baseUrl = 'http://192.168.100.242/api';
+const String storageUrl = 'http://192.168.100.242/storage';

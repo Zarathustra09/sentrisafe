@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'widgets/top_navbar.dart';
 import 'widgets/bottom_navbar.dart';
-import 'pages/home_page.dart'; // Add this import
+import 'pages/home_page.dart';
+import 'pages/announcement_page.dart'; // Add this import
 import 'constants.dart';
 
 class EntryPointPage extends StatefulWidget {
@@ -15,13 +16,11 @@ class _EntryPointPageState extends State<EntryPointPage> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    HomePage(), // Use your actual HomePage widget
+    HomePage(),
     _buildMapPage(),
     _buildReportPage(),
-    _buildDiscussionPage(),
+    AnnouncementPage(), // Replace the discussion page with announcement page
   ];
-
-  // Remove the static _buildHomePage() method completely
 
   static Widget _buildMapPage() {
     return Container(
@@ -116,60 +115,6 @@ class _EntryPointPageState extends State<EntryPointPage> {
                   const SizedBox(height: AppConstants.spacingS),
                   Text(
                     'Report safety incidents and concerns here',
-                    style: TextStyle(
-                      color: Constants.textSecondary,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _buildDiscussionPage() {
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.spacingM),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spacingXL),
-              decoration: BoxDecoration(
-                color: Constants.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                boxShadow: [
-                  BoxShadow(
-                    color: Constants.black.withOpacity(0.1),
-                    blurRadius: AppConstants.elevationL,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.forum_outlined,
-                    size: 48,
-                    color: Constants.accent,
-                  ),
-                  const SizedBox(height: AppConstants.spacingM),
-                  Text(
-                    'Community Discussion',
-                    style: TextStyle(
-                      color: Constants.textPrimary,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spacingS),
-                  Text(
-                    'Join community discussions and forums',
                     style: TextStyle(
                       color: Constants.textSecondary,
                       fontSize: 16,

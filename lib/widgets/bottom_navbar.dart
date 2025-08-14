@@ -61,9 +61,9 @@ class _BottomNavbarState extends State<BottomNavbar> {
           label: 'Report',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.forum_outlined),
-          activeIcon: Icon(Icons.forum),
-          label: 'Discussion',
+          icon: Icon(Icons.announcement_outlined),
+          activeIcon: Icon(Icons.announcement),
+          label: 'Announcements', // Changed from 'Discussion'
         ),
       ],
     );
