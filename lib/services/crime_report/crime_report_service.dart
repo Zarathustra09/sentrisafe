@@ -1,0 +1,204 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import '../../constants.dart';
+import '../../models/crime_report_model.dart';
+import '../auth/auth_service.dart';
+
+class CrimeReportService {
+  static Future<Map<String, dynamic>> submitReport({
+    required String title,
+    required String description,
+    required String severity,
+    required double latitude,
+    required double longitude,
+    String? address,
+    required DateTime incidentDate,
+    File? reportImage,
+  }) async {
+    try {
+      print('=== CRIME REPORT SUBMISSION START ===');
+
+      // Get auth data
+      final token = await AuthService.getAuthToken();
+      final userId = await AuthService.getUserId();
+
+      print('Token: ${token != null ? "Found" : "Not found"}');
+      print('User ID: $userId (Type: ${userId.runtimeType})');
+
+      if (token == null) {
+        print('ERROR: No authentication token found');
+        return {'success': false, 'error': 'Authentication required'};
+      }
+
+      var uri = Uri.parse('$baseUrl/crime-reports');
+      var request = http.MultipartRequest('POST', uri);
+
+      print('API URL: $uri');
+
+      // Add headers
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'application/json';
+      print('Headers added: Authorization and Accept');
+
+      // Add form fields
+      request.fields['title'] = title;
+      request.fields['description'] = description;
+      request.fields['severity'] = severity;
+      request.fields['latitude'] = latitude.toString();
+      request.fields['longitude'] = longitude.toString();
+      request.fields['incident_date'] = incidentDate.toIso8601String().split('T')[0];
+
+      print('Form fields added:');
+      print('- title: $title');
+      print('- description: $description');
+      print('- severity: $severity');
+      print('- latitude: ${latitude.toString()}');
+      print('- longitude: ${longitude.toString()}');
+      print('- incident_date: ${incidentDate.toIso8601String().split('T')[0]}');
+
+      if (address != null && address.isNotEmpty) {
+        request.fields['address'] = address;
+        print('- address: $address');
+      } else {
+        print('- address: not provided');
+      }
+
+      // Use the saved user_id
+      if (userId != null) {
+        request.fields['reported_by'] = userId.toString();
+        print('- reported_by: ${userId.toString()} (converted from ${userId.runtimeType})');
+      } else {
+        print('WARNING: No user ID found');
+      }
+
+      // Add image file if provided
+      if (reportImage != null) {
+        String fileExtension = reportImage.path.split('.').last.toLowerCase();
+        String mimeType = fileExtension == 'png' ? 'png' : 'jpeg';
+        print('Image file: ${reportImage.path} (Type: $mimeType)');
+
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'report_image',
+            reportImage.path,
+            contentType: MediaType('image', mimeType),
+          ),
+        );
+        print('Image file added to request');
+      } else {
+        print('No image file provided');
+      }
+
+      print('Sending request to server...');
+      var streamedResponse = await request.send();
+      var response = await http.Response.fromStream(streamedResponse);
+
+      print('Response status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      final data = jsonDecode(response.body);
+      print('Decoded response data: $data');
+      print('Data type: ${data.runtimeType}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('SUCCESS: Report submission successful');
+
+        try {
+          print('Attempting to create CrimeReport from JSON...');
+          print('Raw data for CrimeReport.fromJson: $data');
+
+          final crimeReport = CrimeReport.fromJson(data);
+          print('CrimeReport created successfully');
+
+          return {
+            'success': true,
+            'report': crimeReport,
+            'message': 'Report submitted successfully'
+          };
+        } catch (e) {
+          print('ERROR creating CrimeReport from JSON: $e');
+          print('Error type: ${e.runtimeType}');
+
+          return {
+            'success': true,
+            'message': 'Report submitted successfully (parsing error: $e)'
+          };
+        }
+      } else {
+        print('ERROR: Server returned error status');
+        print('Error data: ${data['errors']}');
+
+        return {
+          'success': false,
+          'errors': data['errors'] ?? {'general': 'Failed to submit report'},
+        };
+      }
+    } catch (e) {
+      print('EXCEPTION in submitReport: $e');
+      print('Exception type: ${e.runtimeType}');
+      print('Stack trace: ${StackTrace.current}');
+
+      return {
+        'success': false,
+        'errors': {'general': 'Network error: ${e.toString()}'},
+      };
+    } finally {
+      print('=== CRIME REPORT SUBMISSION END ===');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getReports() async {
+    try {
+      print('=== GET REPORTS START ===');
+
+      final token = await AuthService.getAuthToken();
+      print('Token for getReports: ${token != null ? "Found" : "Not found"}');
+
+      if (token == null) {
+        print('ERROR: No authentication token for getReports');
+        return {'success': false, 'error': 'Authentication required'};
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/crime-reports'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('Get reports status code: ${response.statusCode}');
+      print('Get reports response: ${response.body}');
+
+      final data = jsonDecode(response.body);
+      print('Get reports decoded data: $data');
+
+      if (response.statusCode == 200) {
+        try {
+          List<CrimeReport> reports = (data['data'] as List)
+              .map((report) {
+                print('Processing report data: $report');
+                return CrimeReport.fromJson(report);
+              })
+              .toList();
+
+          print('Successfully parsed ${reports.length} reports');
+          return {'success': true, 'reports': reports};
+        } catch (e) {
+          print('ERROR parsing reports list: $e');
+          return {'success': false, 'error': 'Error parsing reports: $e'};
+        }
+      } else {
+        print('ERROR: Get reports failed with status ${response.statusCode}');
+        return {'success': false, 'error': data['error'] ?? 'Failed to load reports'};
+      }
+    } catch (e) {
+      print('EXCEPTION in getReports: $e');
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
+    } finally {
+      print('=== GET REPORTS END ===');
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'widgets/top_navbar.dart';
 import 'widgets/bottom_navbar.dart';
+import 'pages/home_page.dart'; // Add this import
 import 'constants.dart';
 
 class EntryPointPage extends StatefulWidget {
@@ -14,65 +15,13 @@ class _EntryPointPageState extends State<EntryPointPage> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
-    _buildHomePage(),
+    HomePage(), // Use your actual HomePage widget
     _buildMapPage(),
     _buildReportPage(),
     _buildDiscussionPage(),
   ];
 
-  static Widget _buildHomePage() {
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.spacingM),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spacingXL),
-              decoration: BoxDecoration(
-                color: Constants.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                boxShadow: [
-                  BoxShadow(
-                    color: Constants.black.withOpacity(0.1),
-                    blurRadius: AppConstants.elevationL,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.home_outlined,
-                    size: 48,
-                    color: Constants.primary,
-                  ),
-                  const SizedBox(height: AppConstants.spacingM),
-                  Text(
-                    'Welcome Home',
-                    style: TextStyle(
-                      color: Constants.textPrimary,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spacingS),
-                  Text(
-                    'Your dashboard content goes here',
-                    style: TextStyle(
-                      color: Constants.textSecondary,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Remove the static _buildHomePage() method completely
 
   static Widget _buildMapPage() {
     return Container(
