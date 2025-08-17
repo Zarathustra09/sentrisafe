@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
+import '../pages/report_page.dart';
 
 class BottomNavbar extends StatefulWidget {
   final int? initialIndex;
   final Function(int)? onTabChanged;
 
-  const BottomNavbar({
-    Key? key,
-    this.initialIndex,
-    this.onTabChanged,
-  }) : super(key: key);
+  const BottomNavbar({Key? key, this.initialIndex, this.onTabChanged})
+    : super(key: key);
 
   @override
   State<BottomNavbar> createState() => _BottomNavbarState();
@@ -32,6 +30,13 @@ class _BottomNavbarState extends State<BottomNavbar> {
     if (widget.onTabChanged != null) {
       widget.onTabChanged!(index);
     }
+    // Routing logic for tabs
+    if (index == 2) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const ReportPage()),
+      );
+    }
+    // You can add similar logic for other tabs if needed
   }
 
   @override
