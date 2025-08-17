@@ -99,8 +99,10 @@ class AppConstants {
 final passwordValidator = MultiValidator([
   RequiredValidator(errorText: 'Password is required'),
   MinLengthValidator(8, errorText: 'password must be at least 8 digits long'),
-  PatternValidator(r'(?=.*?[#?!@$%^&*-])',
-      errorText: 'passwords must have at least one special character')
+  PatternValidator(
+    r'(?=.*?[#?!@$%^&*-])',
+    errorText: 'passwords must have at least one special character',
+  ),
 ]);
 
 final emaildValidator = MultiValidator([
@@ -108,5 +110,5 @@ final emaildValidator = MultiValidator([
   EmailValidator(errorText: "Enter a valid email address"),
 ]);
 
-const String baseUrl = 'http://192.168.100.242/api';
-const String storageUrl = 'http://192.168.100.242/storage';
+const String baseUrl = 'https://sentrisafe.net/api';
+const String storageUrl = 'https://sentrisafe.net/storage';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
+import '../profile.dart';
 
 class TopNavbar extends StatelessWidget {
   const TopNavbar({Key? key}) : super(key: key);
@@ -19,21 +20,17 @@ class TopNavbar extends StatelessWidget {
       ),
       actions: [
         IconButton(
-          icon: Icon(
-            Icons.search,
-            color: Constants.textSecondary,
-          ),
+          icon: Icon(Icons.search, color: Constants.textSecondary),
           onPressed: () {
             // Handle search functionality
           },
         ),
         IconButton(
-          icon: Icon(
-            Icons.account_circle,
-            color: Constants.textSecondary,
-          ),
+          icon: Icon(Icons.account_circle, color: Constants.textSecondary),
           onPressed: () {
-            // Handle profile icon tap
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (context) => ProfilePage()));
           },
         ),
       ],
