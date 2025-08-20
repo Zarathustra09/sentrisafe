@@ -10,60 +10,56 @@ class MapPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Constants.background,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
+      appBar: const PreferredSize(
+        preferredSize: Size.fromHeight(60),
         child: TopNavbar(),
       ),
-      body: Container(
+      body: Padding(
         padding: const EdgeInsets.all(AppConstants.spacingM),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppConstants.spacingXL),
-                decoration: BoxDecoration(
-                  color: Constants.surface,
-                  borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Constants.black.withOpacity(0.1),
-                      blurRadius: AppConstants.elevationL,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.map_outlined,
-                      size: 48,
-                      color: Constants.primary,
-                    ),
-                    const SizedBox(height: AppConstants.spacingM),
-                    Text(
-                      'Interactive Map',
-                      style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: AppConstants.spacingS),
-                    Text(
-                      'Map functionality will be implemented here',
-                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                        color: Constants.textSecondary,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+        child: Column(
+          children: [
+            // Textboxes
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Where",
+                prefixIcon: const Icon(Icons.my_location),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: AppConstants.spacingM),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "To",
+                prefixIcon: const Icon(Icons.location_on),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppConstants.spacingM),
+
+            // Wallpaper / Icon
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusL),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.map_outlined,
+                    size: 100,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      bottomNavigationBar: BottomNavbar(),
+      bottomNavigationBar: const BottomNavbar(),
     );
   }
 }
