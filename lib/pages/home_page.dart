@@ -369,9 +369,12 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title Field
-                  TextFormField(
-                    controller: _titleController,
+
+                  DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: _titleController.text.isNotEmpty ? _titleController.text : null,
                     style: TextStyle(color: Constants.textPrimary),
+                    dropdownColor: Constants.surface,
                     decoration: InputDecoration(
                       labelText: 'Incident Title',
                       labelStyle: TextStyle(color: Constants.textSecondary),
@@ -387,7 +390,79 @@ class _HomePageState extends State<HomePage> {
                         borderRadius: BorderRadius.circular(AppConstants.radiusM),
                         borderSide: BorderSide(color: Constants.primary),
                       ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
+                    items: [
+                      for (final value in [
+                        'Illegal gambling (STL, jueteng)',
+                        'Illegal possession of firearms',
+                        'Drug-related offenses (shabu buy-busts)',
+                        'Robbery / Burglary (shops, houses)',
+                        'Snatching / street theft (often by motorcycle riders)',
+                        'Violent crimes (murder, shootings, assaults)',
+                        'Sexual offenses (rape, harassment)',
+                        'Murder / Homicide',
+                        'Physical injuries / Assault',
+                        'Rape / Sexual assault',
+                        'Robbery',
+                        'Theft / Snatching',
+                        'Burglary',
+                        'Carnapping',
+                        'Arson',
+                        'Illegal drugs (possession, trafficking, use)',
+                        'Illegal possession of firearms',
+                        'Illegal discharge of firearms',
+                        'Violence against women and children (VAWC)',
+                        'Child abuse / exploitation',
+                        'Human trafficking',
+                        'Estafa / Swindling',
+                        'Cybercrime (scams, hacking, phishing)',
+                        'Forgery / Falsification of documents',
+                        'Bribery / Corruption',
+                        'Illegal recruitment',
+                        'Illegal gambling',
+                        'Drunk and disorderly conduct',
+                        'Vandalism',
+                        'Public scandal / Grave threats / Grave coercion',
+                        'Trespassing',
+                        'Environmental crimes (illegal logging, quarrying, wildlife trade)',
+                        'Smuggling',
+                        'Curfew violations'
+                      ])
+                        DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            value,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                    ],
+                    selectedItemBuilder: (context) {
+                      final items = [
+                        'Illegal gambling (STL, jueteng)',
+                        'Illegal possession of firearms',
+                        'Drug-related offenses (shabu buy-busts)',
+                        // ... (add all your items here)
+                        'Curfew violations',
+                      ];
+                      return items.map((value) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            value,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: TextStyle(color: Constants.textPrimary),
+                          ),
+                        );
+                      }).toList();
+                    },
+                    onChanged: (value) {
+                      setState(() {
+                        _titleController.text = value ?? '';
+                      });
+                    },
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Title is required';
