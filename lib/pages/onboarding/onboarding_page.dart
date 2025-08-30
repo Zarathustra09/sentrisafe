@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../constants.dart';
 import '../../route/route_constant.dart';
-
+import '../../../services/shared_preferences.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -61,6 +61,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     super.dispose();
   }
 
+  Future<void> _handleGetStarted() async {
+    await SharedPrefService.setIsNew(false);
+    Navigator.pushReplacementNamed(context, loginScreenRoute);
+  }
+
+  Future<void> _handleSignUp() async {
+    await SharedPrefService.setIsNew(false);
+    Navigator.pushReplacementNamed(context, registerScreenRoute);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -90,7 +100,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     child: Column(
                       children: [
                         const Spacer(flex: 2),
-
                         // Logo/Hero Image
                         FadeTransition(
                           opacity: _fadeAnimation,
@@ -118,7 +127,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-
                         const Spacer(flex: 2),
                       ],
                     ),
@@ -126,7 +134,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
               ),
             ),
-
             // Bottom section with dark background
             Expanded(
               flex: 4,
@@ -146,7 +153,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     child: Column(
                       children: [
                         const Spacer(),
-
                         // Welcome Text
                         SlideTransition(
                           position: _slideAnimation,
@@ -163,9 +169,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-
                         SizedBox(height: AppConstants.spacingXL),
-
                         // Description
                         SlideTransition(
                           position: _slideAnimation,
@@ -182,9 +186,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-
                         const Spacer(),
-
                         // Get Started Button
                         SlideTransition(
                           position: _slideAnimation,
@@ -194,9 +196,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               width: double.infinity,
                               height: 56,
                               child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, loginScreenRoute);
-                                },
+                                onPressed: _handleGetStarted,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Constants.primary,
                                   foregroundColor: Constants.white,
@@ -218,9 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-
                         SizedBox(height: AppConstants.spacingM),
-
                         // Sign up option
                         SlideTransition(
                           position: _slideAnimation,
@@ -237,9 +235,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                   ),
                                 ),
                                 TextButton(
-                                  onPressed: () {
-                                    Navigator.pushNamed(context, registerScreenRoute);
-                                  },
+                                  onPressed: _handleSignUp,
                                   style: TextButton.styleFrom(
                                     foregroundColor: Constants.primary,
                                     padding: EdgeInsets.symmetric(
@@ -259,7 +255,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             ),
                           ),
                         ),
-
                         const Spacer(),
                       ],
                     ),
