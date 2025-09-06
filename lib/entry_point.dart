@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:sentrisafe/pages/map_page.dart';
+import 'package:sentrisafe/pages/report_page.dart';
 import 'widgets/top_navbar.dart';
 import 'widgets/bottom_navbar.dart';
 import 'pages/home_page.dart';
-import 'pages/announcement_page.dart'; // Add this import
+import 'pages/announcement_page.dart';
 import 'constants.dart';
 
 class EntryPointPage extends StatefulWidget {
@@ -18,118 +19,10 @@ class _EntryPointPageState extends State<EntryPointPage> {
 
   final List<Widget> _pages = [
     HomePage(),
-    MapPage(), // Use the actual MapPage instead of _buildMapPage()
-    _buildReportPage(),
-    AnnouncementPage(), // Replace the discussion page with announcement page
+    MapPage(),
+    ReportPage(), // Use the actual ReportPage
+    AnnouncementPage(),
   ];
-
-  static Widget _buildMapPage() {
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.spacingM),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spacingXL),
-              decoration: BoxDecoration(
-                color: Constants.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                boxShadow: [
-                  BoxShadow(
-                    color: Constants.black.withOpacity(0.1),
-                    blurRadius: AppConstants.elevationL,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.map_outlined,
-                    size: 48,
-                    color: Constants.primary,
-                  ),
-                  const SizedBox(height: AppConstants.spacingM),
-                  Text(
-                    'Interactive Map',
-                    style: TextStyle(
-                      color: Constants.textPrimary,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spacingS),
-                  Text(
-                    'Map functionality will be implemented here',
-                    style: TextStyle(
-                      color: Constants.textSecondary,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _buildReportPage() {
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.spacingM),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spacingXL),
-              decoration: BoxDecoration(
-                color: Constants.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                boxShadow: [
-                  BoxShadow(
-                    color: Constants.black.withOpacity(0.1),
-                    blurRadius: AppConstants.elevationL,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.report_outlined,
-                    size: 48,
-                    color: Constants.warning,
-                  ),
-                  const SizedBox(height: AppConstants.spacingM),
-                  Text(
-                    'Report Incidents',
-                    style: TextStyle(
-                      color: Constants.textPrimary,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: AppConstants.spacingS),
-                  Text(
-                    'Report safety incidents and concerns here',
-                    style: TextStyle(
-                      color: Constants.textSecondary,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _onTabChanged(int index) {
     setState(() {

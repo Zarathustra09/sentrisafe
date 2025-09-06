@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
-import '../widgets/top_navbar.dart';
-import '../widgets/bottom_navbar.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../constants.dart';
 import '../services/crime_report/crime_report_service.dart';
+import '../models/crime_report_model.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({Key? key}) : super(key: key);
@@ -15,589 +11,464 @@ class ReportPage extends StatefulWidget {
   State<ReportPage> createState() => _ReportPageState();
 }
 
-class _ReportPageState extends State<ReportPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _latitudeController = TextEditingController();
-  final _longitudeController = TextEditingController();
+class _ReportPageState extends State<ReportPage> with SingleTickerProviderStateMixin {
+  List<CrimeReport> _reports = [];
+  bool _isLoadingReports = false;
+  String? _filterSeverity;
+  String? _filterStatus;
+  Set<Marker> _markers = {};
+  GoogleMapController? _mapController;
 
-  String _selectedSeverity = 'low';
-  DateTime _selectedDate = DateTime.now();
-  File? _selectedImage;
-  bool _isSubmitting = false;
-  bool _isLoadingLocation = false;
+  late TabController _tabController;
 
-  final ImagePicker _picker = ImagePicker();
+  // Tinurik, Tanauan City, Batangas coordinates
+  static const CameraPosition _defaultLocation = CameraPosition(
+    target: LatLng(14.0865, 121.1497), // Tinurik, Tanauan City, Batangas
+    zoom: 15,
+  );
 
-  Future<void> _getCurrentLocation() async {
+  // Boundaries for Tinurik, Tanauan City, Batangas (approximate)
+  static final LatLngBounds _tinurikBounds = LatLngBounds(
+    southwest: LatLng(14.0800, 121.1400), // Southwest boundary
+    northeast: LatLng(14.0930, 121.1594), // Northeast boundary
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadReports();
+  }
+
+  Future<void> _loadReports() async {
     setState(() {
-      _isLoadingLocation = true;
+      _isLoadingReports = true;
     });
 
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw 'Location permissions are denied';
-        }
+      final result = await CrimeReportService.getReports();
+      if (result['success']) {
+        setState(() {
+          _reports = result['reports'];
+          _createMapMarkers();
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to load reports'),
+            backgroundColor: Constants.error,
+          ),
+        );
       }
-      if (permission == LocationPermission.deniedForever) {
-        throw 'Location permissions are permanently denied';
-      }
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      setState(() {
-        _latitudeController.text = position.latitude.toStringAsFixed(6);
-        _longitudeController.text = position.longitude.toStringAsFixed(6);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Location obtained successfully'),
-          backgroundColor: Constants.success,
-        ),
-      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to get location: $e'),
+          content: Text('Error loading reports: $e'),
           backgroundColor: Constants.error,
         ),
       );
     } finally {
       setState(() {
-        _isLoadingLocation = false;
+        _isLoadingReports = false;
       });
     }
   }
 
-  Future<void> _pickImageFromCamera() async {
-    try {
-      PermissionStatus cameraPermission = await Permission.camera.request();
-      if (cameraPermission.isGranted) {
-        final XFile? image = await _picker.pickImage(
-          source: ImageSource.camera,
-          imageQuality: 80,
-          maxWidth: 1024,
-          maxHeight: 1024,
-        );
-        if (image != null) {
-          setState(() {
-            _selectedImage = File(image.path);
-          });
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Camera permission is required to take photos'),
-            backgroundColor: Constants.error,
-          ),
-        );
-      }
-    } catch (e) {
+  Future<void> _refreshReports() async {
+    await _loadReports();
+
+    // Show success message after refresh
+    if (mounted && !_isLoadingReports) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to take photo: $e'),
-          backgroundColor: Constants.error,
+          content: Text('Reports refreshed'),
+          backgroundColor: Constants.success,
+          duration: Duration(seconds: 1),
         ),
       );
     }
   }
 
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: Constants.primary,
-              surface: Constants.surface,
+  void _createMapMarkers() {
+    _markers.clear();
+
+    for (int i = 0; i < _reports.length; i++) {
+      final report = _reports[i];
+
+      // Only add markers for reports within Tinurik bounds
+      if (_isWithinTinurikBounds(report.latitude, report.longitude)) {
+        Color markerColor;
+        switch (report.severity.toLowerCase()) {
+          case 'critical':
+            markerColor = Constants.error;
+            break;
+          case 'high':
+            markerColor = Constants.warning;
+            break;
+          case 'medium':
+            markerColor = Constants.info;
+            break;
+          default:
+            markerColor = Constants.success;
+        }
+
+        _markers.add(
+          Marker(
+            markerId: MarkerId('report_$i'),
+            position: LatLng(report.latitude, report.longitude),
+            infoWindow: InfoWindow(
+              title: report.title,
+              snippet: '${report.severity} - ${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
             ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  Future<void> _submitReport() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    try {
-      final result = await CrimeReportService.submitReport(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        severity: _selectedSeverity,
-        latitude: double.parse(_latitudeController.text.trim()),
-        longitude: double.parse(_longitudeController.text.trim()),
-        address: _addressController.text.trim().isEmpty
-            ? null
-            : _addressController.text.trim(),
-        incidentDate: _selectedDate,
-        reportImage: _selectedImage,
-      );
-
-      if (result['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Report submitted successfully'),
-            backgroundColor: Constants.success,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        _resetForm();
-      } else {
-        String errorMessage = 'Failed to submit report';
-        if (result['errors'] is Map) {
-          errorMessage = result['errors'].values.first.toString();
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Constants.error,
+            onTap: () => _showReportDetails(report),
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Constants.error,
-        ),
-      );
     }
-
-    setState(() {
-      _isSubmitting = false;
-    });
   }
 
-  void _resetForm() {
-    _titleController.clear();
-    _descriptionController.clear();
-    _addressController.clear();
-    _latitudeController.clear();
-    _longitudeController.clear();
-    setState(() {
-      _selectedSeverity = 'low';
-      _selectedDate = DateTime.now();
-      _selectedImage = null;
-    });
+  bool _isWithinTinurikBounds(double lat, double lng) {
+    return lat >= _tinurikBounds.southwest.latitude &&
+           lat <= _tinurikBounds.northeast.latitude &&
+           lng >= _tinurikBounds.southwest.longitude &&
+           lng <= _tinurikBounds.northeast.longitude;
+  }
+
+  void _showReportDetails(CrimeReport report) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Constants.surface,
+        title: Text(
+          report.title,
+          style: TextStyle(color: Constants.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Description: ${report.description}',
+              style: TextStyle(color: Constants.textSecondary),
+            ),
+            SizedBox(height: AppConstants.spacingS),
+            Text(
+              'Severity: ${report.severity}',
+              style: TextStyle(color: _getSeverityColor(report.severity)),
+            ),
+            SizedBox(height: AppConstants.spacingS),
+            Text(
+              'Date: ${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
+              style: TextStyle(color: Constants.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close', style: TextStyle(color: Constants.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'critical':
+        return Constants.error;
+      case 'high':
+        return Constants.warning;
+      case 'medium':
+        return Constants.info;
+      default:
+        return Constants.success;
+    }
+  }
+
+  Widget _buildReportItem(CrimeReport report) {
+    Color severityColor = _getSeverityColor(report.severity);
+    IconData severityIcon;
+
+    switch (report.severity.toLowerCase()) {
+      case 'critical':
+        severityIcon = Icons.crisis_alert;
+        break;
+      case 'high':
+        severityIcon = Icons.warning;
+        break;
+      case 'medium':
+        severityIcon = Icons.info;
+        break;
+      default:
+        severityIcon = Icons.info_outline;
+    }
+
+    return Card(
+      color: Constants.surface,
+      margin: EdgeInsets.only(bottom: AppConstants.spacingM),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+      ),
+      child: InkWell(
+        onTap: () => _showReportDetails(report),
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+        child: Padding(
+          padding: EdgeInsets.all(AppConstants.spacingM),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(severityIcon, color: severityColor, size: 20),
+                  SizedBox(width: AppConstants.spacingS),
+                  Expanded(
+                    child: Text(
+                      report.title,
+                      style: TextStyle(
+                        color: Constants.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppConstants.spacingS,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: severityColor,
+                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                    ),
+                    child: Text(
+                      report.severity.toUpperCase(),
+                      style: TextStyle(
+                        color: Constants.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: AppConstants.spacingS),
+              Text(
+                report.description,
+                style: TextStyle(color: Constants.textSecondary),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              SizedBox(height: AppConstants.spacingS),
+              Text(
+                'Date: ${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
+                style: TextStyle(color: Constants.textHint, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Constants.background,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: TopNavbar(),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(AppConstants.spacingM),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                SizedBox(height: AppConstants.spacingL),
-                // Step 1: Title
-                Row(
-                  children: [
-                    Icon(Icons.title, color: Constants.primary),
-                    SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'Incident Title',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
+    return Container(
+      color: Constants.background,
+      child: Column(
+        children: [
+          Container(
+            color: Constants.surface,
+            padding: EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Constants.primary,
+              unselectedLabelColor: Constants.textSecondary,
+              indicatorColor: Constants.primary,
+              tabs: [
+                Tab(
+                  icon: Icon(Icons.map),
+                  text: 'Map View',
                 ),
-                SizedBox(height: AppConstants.spacingXS),
-                TextFormField(
-                  controller: _titleController,
-                  style: TextStyle(color: Constants.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Enter a short title',
-                    hintStyle: TextStyle(color: Constants.textHint),
-                    filled: true,
-                    fillColor: Constants.surfaceLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Title is required'
-                      : null,
-                ),
-                SizedBox(height: AppConstants.spacingM),
-                // Step 2: Description
-                Row(
-                  children: [
-                    Icon(Icons.description, color: Constants.primary),
-                    SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'Description',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppConstants.spacingXS),
-                TextFormField(
-                  controller: _descriptionController,
-                  style: TextStyle(color: Constants.textPrimary),
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    hintText: 'Describe what happened',
-                    hintStyle: TextStyle(color: Constants.textHint),
-                    filled: true,
-                    fillColor: Constants.surfaceLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Description is required'
-                      : null,
-                ),
-                SizedBox(height: AppConstants.spacingM),
-                // Step 3: Severity
-                Row(
-                  children: [
-                    Icon(Icons.warning_amber, color: Constants.primary),
-                    SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'Severity',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppConstants.spacingXS),
-                DropdownButtonFormField<String>(
-                  value: _selectedSeverity,
-                  style: TextStyle(color: Constants.textPrimary),
-                  dropdownColor: Constants.surface,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: Constants.surfaceLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'low', child: Text('Low')),
-                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                    DropdownMenuItem(value: 'high', child: Text('High')),
-                    DropdownMenuItem(
-                      value: 'critical',
-                      child: Text('Critical'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedSeverity = value!;
-                    });
-                  },
-                ),
-                SizedBox(height: AppConstants.spacingM),
-                // Step 4: Location
-                Row(
-                  children: [
-                    Icon(Icons.location_on, color: Constants.primary),
-                    SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'Location',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: _isLoadingLocation
-                          ? null
-                          : _getCurrentLocation,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Constants.primary,
-                        foregroundColor: Constants.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppConstants.radiusS,
-                          ),
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      icon: _isLoadingLocation
-                          ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                color: Constants.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Icon(Icons.my_location, size: 20),
-                      label: Text(
-                        _isLoadingLocation ? 'Getting...' : 'Use Current',
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppConstants.spacingXS),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _latitudeController,
-                        style: TextStyle(color: Constants.textPrimary),
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: 'Latitude',
-                          hintStyle: TextStyle(color: Constants.textHint),
-                          filled: true,
-                          fillColor: Constants.surfaceLight,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppConstants.radiusM,
-                            ),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          double? lat = double.tryParse(value);
-                          if (lat == null || lat < -90 || lat > 90) {
-                            return 'Invalid latitude';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    SizedBox(width: AppConstants.spacingM),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _longitudeController,
-                        style: TextStyle(color: Constants.textPrimary),
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: 'Longitude',
-                          hintStyle: TextStyle(color: Constants.textHint),
-                          filled: true,
-                          fillColor: Constants.surfaceLight,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppConstants.radiusM,
-                            ),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Required';
-                          }
-                          double? lng = double.tryParse(value);
-                          if (lng == null || lng < -180 || lng > 180) {
-                            return 'Invalid longitude';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppConstants.spacingXS),
-                TextFormField(
-                  controller: _addressController,
-                  style: TextStyle(color: Constants.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Address (optional)',
-                    hintStyle: TextStyle(color: Constants.textHint),
-                    filled: true,
-                    fillColor: Constants.surfaceLight,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                SizedBox(height: AppConstants.spacingM),
-                // Step 5: Date
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, color: Constants.primary),
-                    SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'Incident Date',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppConstants.spacingXS),
-                GestureDetector(
-                  onTap: _selectDate,
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Constants.surfaceLight,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          color: Constants.textSecondary,
-                        ),
-                        SizedBox(width: AppConstants.spacingM),
-                        Text(
-                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                          style: TextStyle(color: Constants.textPrimary),
-                        ),
-                        Spacer(),
-                        Text(
-                          'Change',
-                          style: TextStyle(
-                            color: Constants.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: AppConstants.spacingM),
-                // Step 6: Photo
-                Row(
-                  children: [
-                    Icon(Icons.camera_alt, color: Constants.primary),
-                    SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'Photo (optional)',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppConstants.spacingXS),
-                GestureDetector(
-                  onTap: _pickImageFromCamera,
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Constants.surfaceLight,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.camera_alt, color: Constants.textSecondary),
-                        SizedBox(width: AppConstants.spacingM),
-                        Expanded(
-                          child: Text(
-                            _selectedImage != null
-                                ? 'Photo selected: ${_selectedImage!.path.split('/').last}'
-                                : 'Tap to take a photo',
-                            style: TextStyle(color: Constants.textPrimary),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: AppConstants.spacingL),
-                // Submit Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSubmitting ? null : _submitReport,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Constants.primary,
-                      foregroundColor: Constants.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusM,
-                        ),
-                      ),
-                    ),
-                    icon: _isSubmitting
-                        ? SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Constants.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : Icon(Icons.send),
-                    label: Text(
-                      _isSubmitting ? 'Submitting...' : 'Submit Report',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                Tab(
+                  icon: Icon(Icons.list),
+                  text: 'List View',
                 ),
               ],
             ),
           ),
-        ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildMapView(),
+                _buildListView(),
+              ],
+            ),
+          ),
+        ],
       ),
-      bottomNavigationBar: BottomNavbar(),
+    );
+  }
+
+  Widget _buildMapView() {
+    return RefreshIndicator(
+      onRefresh: _refreshReports,
+      color: Constants.primary,
+      backgroundColor: Constants.surface,
+      strokeWidth: 3,
+      child: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: _defaultLocation,
+            markers: _markers,
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+            cameraTargetBounds: CameraTargetBounds(_tinurikBounds),
+            minMaxZoomPreference: MinMaxZoomPreference(13.0, 18.0),
+          ),
+          Positioned(
+            top: AppConstants.spacingM,
+            left: AppConstants.spacingM,
+            right: AppConstants.spacingM,
+            child: Container(
+              padding: EdgeInsets.all(AppConstants.spacingM),
+              decoration: BoxDecoration(
+                color: Constants.surface,
+                borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                boxShadow: [
+                  BoxShadow(
+                    color: Constants.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on, color: Constants.primary),
+                  SizedBox(width: AppConstants.spacingS),
+                  Expanded(
+                    child: Text(
+                      'Tinurik, Tanauan City, Batangas - ${_reports.length} reports',
+                      style: TextStyle(
+                        color: Constants.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isLoadingReports)
+            Container(
+              color: Constants.black.withOpacity(0.3),
+              child: Center(
+                child: CircularProgressIndicator(color: Constants.primary),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListView() {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(AppConstants.spacingM),
+          child: Row(
+            children: [
+              Icon(Icons.report, color: Constants.primary),
+              SizedBox(width: AppConstants.spacingS),
+              Text(
+                'Crime Reports',
+                style: TextStyle(
+                  color: Constants.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Spacer(),
+              Text(
+                '${_reports.length} item${_reports.length != 1 ? 's' : ''}',
+                style: TextStyle(
+                  color: Constants.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _refreshReports,
+            color: Constants.primary,
+            backgroundColor: Constants.surface,
+            strokeWidth: 3,
+            child: _isLoadingReports
+                ? ListView(
+                    physics: AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                      Center(
+                        child: Column(
+                          children: [
+                            CircularProgressIndicator(color: Constants.primary),
+                            SizedBox(height: AppConstants.spacingM),
+                            Text(
+                              'Loading reports...',
+                              style: TextStyle(color: Constants.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : _reports.isEmpty
+                    ? ListView(
+                        physics: AlwaysScrollableScrollPhysics(),
+                        children: [
+                          SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                          Center(
+                            child: Column(
+                              children: [
+                                Icon(Icons.inbox, size: 64, color: Constants.textSecondary),
+                                SizedBox(height: AppConstants.spacingM),
+                                Text(
+                                  'No reports found',
+                                  style: TextStyle(color: Constants.textSecondary),
+                                ),
+                                SizedBox(height: AppConstants.spacingS),
+                                Text(
+                                  'Pull down to refresh',
+                                  style: TextStyle(
+                                    color: Constants.textHint,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        physics: AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.all(AppConstants.spacingM),
+                        itemCount: _reports.length,
+                        itemBuilder: (context, index) => _buildReportItem(_reports[index]),
+                      ),
+          ),
+        ),
+      ],
     );
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _addressController.dispose();
-    _latitudeController.dispose();
-    _longitudeController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 }

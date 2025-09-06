@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
-import '../pages/report_page.dart';
 
 class BottomNavbar extends StatefulWidget {
   final int? initialIndex;
@@ -22,6 +21,16 @@ class _BottomNavbarState extends State<BottomNavbar> {
     _selectedIndex = widget.initialIndex ?? 0;
   }
 
+  @override
+  void didUpdateWidget(BottomNavbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialIndex != oldWidget.initialIndex && widget.initialIndex != null) {
+      setState(() {
+        _selectedIndex = widget.initialIndex!;
+      });
+    }
+  }
+
   void _onItemTapped(int index) {
     if (_selectedIndex == index) return;
     setState(() {
@@ -30,13 +39,6 @@ class _BottomNavbarState extends State<BottomNavbar> {
     if (widget.onTabChanged != null) {
       widget.onTabChanged!(index);
     }
-    // Routing logic for tabs
-    if (index == 2) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const ReportPage()),
-      );
-    }
-    // You can add similar logic for other tabs if needed
   }
 
   @override
@@ -68,7 +70,7 @@ class _BottomNavbarState extends State<BottomNavbar> {
         BottomNavigationBarItem(
           icon: Icon(Icons.announcement_outlined),
           activeIcon: Icon(Icons.announcement),
-          label: 'Announcements', // Changed from 'Discussion'
+          label: 'Announcements',
         ),
       ],
     );

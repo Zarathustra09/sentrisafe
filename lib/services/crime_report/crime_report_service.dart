@@ -201,4 +201,76 @@ class CrimeReportService {
       print('=== GET REPORTS END ===');
     }
   }
+
+  // Add these methods to your CrimeReportService class
+  static Future<Map<String, dynamic>> getReportsWithFilters({
+    String? severity,
+    String? status,
+    double? lat,
+    double? lng,
+    double? radius,
+    int page = 1,
+  }) async {
+    try {
+      print('=== GET REPORTS WITH FILTERS START ===');
+
+      final token = await AuthService.getAuthToken();
+      if (token == null) {
+        return {'success': false, 'error': 'Authentication required'};
+      }
+
+      // Build query parameters
+      Map<String, String> queryParams = {'page': page.toString()};
+
+      if (severity != null) queryParams['severity'] = severity;
+      if (status != null) queryParams['status'] = status;
+      if (lat != null) queryParams['lat'] = lat.toString();
+      if (lng != null) queryParams['lng'] = lng.toString();
+      if (radius != null) queryParams['radius'] = radius.toString();
+
+      final uri = Uri.parse('$baseUrl/crime-reports').replace(queryParameters: queryParams);
+      print('Request URL: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        try {
+          List<CrimeReport> reports = (data['data'] as List)
+              .map((report) => CrimeReport.fromJson(report))
+              .toList();
+
+          return {
+            'success': true,
+            'reports': reports,
+            'pagination': {
+              'current_page': data['current_page'],
+              'last_page': data['last_page'],
+              'total': data['total'],
+            }
+          };
+        } catch (e) {
+          print('ERROR parsing reports: $e');
+          return {'success': false, 'error': 'Error parsing reports: $e'};
+        }
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Failed to load reports'};
+      }
+    } catch (e) {
+      print('EXCEPTION in getReportsWithFilters: $e');
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
+    } finally {
+      print('=== GET REPORTS WITH FILTERS END ===');
+    }
+  }
 }
