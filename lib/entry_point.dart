@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sentrisafe/pages/map_page.dart';
 import 'widgets/top_navbar.dart';
 import 'widgets/bottom_navbar.dart';
 import 'pages/home_page.dart';
@@ -17,7 +18,7 @@ class _EntryPointPageState extends State<EntryPointPage> {
 
   final List<Widget> _pages = [
     HomePage(),
-    _buildMapPage(),
+    MapPage(), // Use the actual MapPage instead of _buildMapPage()
     _buildReportPage(),
     AnnouncementPage(), // Replace the discussion page with announcement page
   ];
