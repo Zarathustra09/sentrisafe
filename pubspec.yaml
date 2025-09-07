@@ -46,8 +46,6 @@ dependencies:
   google_polyline_algorithm: ^3.1.0
   flutter_typeahead: ^5.2.0
   flutter_tts: ^4.2.3
-  wakelock: ^0.4.0
-  google_navigation_flutter: ^0.6.4
 
 dev_dependencies:
   flutter_test:
