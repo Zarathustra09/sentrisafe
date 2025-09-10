@@ -1,7 +1,7 @@
 class CrimeReport {
   final int? id;
   final String title;
-  final String description;
+  final String? description; // Make this nullable
   final String severity;
   final double latitude;
   final double longitude;
@@ -15,7 +15,7 @@ class CrimeReport {
   CrimeReport({
     this.id,
     required this.title,
-    required this.description,
+    this.description, // Remove required
     required this.severity,
     required this.latitude,
     required this.longitude,
@@ -44,7 +44,7 @@ class CrimeReport {
     return CrimeReport(
       id: json['id'],
       title: json['title'],
-      description: json['description'],
+      description: json['description'], // This can now be null
       severity: json['severity'],
       latitude: double.parse(json['latitude'].toString()),
       longitude: double.parse(json['longitude'].toString()),

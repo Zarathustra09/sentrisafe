@@ -9,7 +9,7 @@ import '../auth/auth_service.dart';
 class CrimeReportService {
   static Future<Map<String, dynamic>> submitReport({
     required String title,
-    required String description,
+    String? description,
     required String severity,
     required double latitude,
     required double longitude,
@@ -44,7 +44,9 @@ class CrimeReportService {
 
       // Add form fields
       request.fields['title'] = title;
-      request.fields['description'] = description;
+      if (description != null && description.isNotEmpty) {
+        request.fields['description'] = description;
+      }
       request.fields['severity'] = severity;
       request.fields['latitude'] = latitude.toString();
       request.fields['longitude'] = longitude.toString();

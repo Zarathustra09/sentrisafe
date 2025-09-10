@@ -141,7 +141,9 @@ class _HomePageState extends State<HomePage> {
     try {
       final result = await CrimeReportService.submitReport(
         title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty
+            ? null  // Pass null if description is empty
+            : _descriptionController.text.trim(),
         severity: _selectedSeverity,
         latitude: double.parse(_latitudeController.text.trim()),
         longitude: double.parse(_longitudeController.text.trim()),
@@ -368,8 +370,7 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title Field
-
+                  // Title Field - Fixed Dropdown
                   DropdownButtonFormField<String>(
                     isExpanded: true,
                     value: _titleController.text.isNotEmpty ? _titleController.text : null,
@@ -393,71 +394,48 @@ class _HomePageState extends State<HomePage> {
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                     ),
                     items: [
-                      for (final value in [
-                        'Illegal gambling (STL, jueteng)',
-                        'Illegal possession of firearms',
-                        'Drug-related offenses (shabu buy-busts)',
-                        'Robbery / Burglary (shops, houses)',
-                        'Snatching / street theft (often by motorcycle riders)',
-                        'Violent crimes (murder, shootings, assaults)',
-                        'Sexual offenses (rape, harassment)',
-                        'Murder / Homicide',
-                        'Physical injuries / Assault',
-                        'Rape / Sexual assault',
-                        'Robbery',
-                        'Theft / Snatching',
-                        'Burglary',
-                        'Carnapping',
-                        'Arson',
-                        'Illegal drugs (possession, trafficking, use)',
-                        'Illegal possession of firearms',
-                        'Illegal discharge of firearms',
-                        'Violence against women and children (VAWC)',
-                        'Child abuse / exploitation',
-                        'Human trafficking',
-                        'Estafa / Swindling',
-                        'Cybercrime (scams, hacking, phishing)',
-                        'Forgery / Falsification of documents',
-                        'Bribery / Corruption',
-                        'Illegal recruitment',
-                        'Illegal gambling',
-                        'Drunk and disorderly conduct',
-                        'Vandalism',
-                        'Public scandal / Grave threats / Grave coercion',
-                        'Trespassing',
-                        'Environmental crimes (illegal logging, quarrying, wildlife trade)',
-                        'Smuggling',
-                        'Curfew violations'
-                      ])
-                        DropdownMenuItem(
-                          value: value,
-                          child: Text(
-                            value,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                    ],
-                    selectedItemBuilder: (context) {
-                      final items = [
-                        'Illegal gambling (STL, jueteng)',
-                        'Illegal possession of firearms',
-                        'Drug-related offenses (shabu buy-busts)',
-                        // ... (add all your items here)
-                        'Curfew violations',
-                      ];
-                      return items.map((value) {
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            value,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            style: TextStyle(color: Constants.textPrimary),
-                          ),
-                        );
-                      }).toList();
-                    },
+                      'Illegal gambling (STL, jueteng)',
+                      'Illegal possession of firearms',
+                      'Drug-related offenses (shabu buy-busts)',
+                      'Robbery / Burglary (shops, houses)',
+                      'Snatching / street theft (often by motorcycle riders)',
+                      'Violent crimes (murder, shootings, assaults)',
+                      'Sexual offenses (rape, harassment)',
+                      'Murder / Homicide',
+                      'Physical injuries / Assault',
+                      'Rape / Sexual assault',
+                      'Robbery',
+                      'Theft / Snatching',
+                      'Burglary',
+                      'Carnapping',
+                      'Arson',
+                      'Illegal drugs (possession, trafficking, use)',
+                      'Illegal possession of firearms',
+                      'Illegal discharge of firearms',
+                      'Violence against women and children (VAWC)',
+                      'Child abuse / exploitation',
+                      'Human trafficking',
+                      'Estafa / Swindling',
+                      'Cybercrime (scams, hacking, phishing)',
+                      'Forgery / Falsification of documents',
+                      'Bribery / Corruption',
+                      'Illegal recruitment',
+                      'Illegal gambling',
+                      'Drunk and disorderly conduct',
+                      'Vandalism',
+                      'Public scandal / Grave threats / Grave coercion',
+                      'Trespassing',
+                      'Environmental crimes (illegal logging, quarrying, wildlife trade)',
+                      'Smuggling',
+                      'Curfew violations'
+                    ].map((value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(
+                        value,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    )).toList(),
                     onChanged: (value) {
                       setState(() {
                         _titleController.text = value ?? '';
@@ -471,13 +449,13 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
                   const SizedBox(height: AppConstants.spacingM),
-                  // Description Field
+                  // Description Field - Made Optional
                   TextFormField(
                     controller: _descriptionController,
                     style: TextStyle(color: Constants.textPrimary),
                     maxLines: 4,
                     decoration: InputDecoration(
-                      labelText: 'Description',
+                      labelText: 'Description (Optional)',
                       labelStyle: TextStyle(color: Constants.textSecondary),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(AppConstants.radiusM),
@@ -492,12 +470,7 @@ class _HomePageState extends State<HomePage> {
                         borderSide: BorderSide(color: Constants.primary),
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Description is required';
-                      }
-                      return null;
-                    },
+                    // Validator removed to make it optional
                   ),
                   const SizedBox(height: AppConstants.spacingM),
                   // Severity Dropdown

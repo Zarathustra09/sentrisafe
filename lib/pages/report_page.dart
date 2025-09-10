@@ -148,13 +148,13 @@ class _ReportPageState extends State<ReportPage> with SingleTickerProviderStateM
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Description: ${report.description}',
+              'Description: ${report.description ?? "No description provided"}', // Handle null description
               style: TextStyle(color: Constants.textSecondary),
             ),
             SizedBox(height: AppConstants.spacingS),
             Text(
               'Severity: ${report.severity}',
-              style: TextStyle(color: _getSeverityColor(report.severity)),
+              style: TextStyle(color: Constants.textSecondary),
             ),
             SizedBox(height: AppConstants.spacingS),
             Text(
@@ -238,14 +238,14 @@ class _ReportPageState extends State<ReportPage> with SingleTickerProviderStateM
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: severityColor,
+                      color: severityColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(AppConstants.radiusS),
                     ),
                     child: Text(
                       report.severity.toUpperCase(),
                       style: TextStyle(
-                        color: Constants.white,
-                        fontSize: 10,
+                        color: severityColor,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -254,15 +254,36 @@ class _ReportPageState extends State<ReportPage> with SingleTickerProviderStateM
               ),
               SizedBox(height: AppConstants.spacingS),
               Text(
-                report.description,
-                style: TextStyle(color: Constants.textSecondary),
+                report.description ?? "No description provided", // Handle null description
+                style: TextStyle(
+                  color: Constants.textSecondary,
+                  fontSize: 14,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               SizedBox(height: AppConstants.spacingS),
-              Text(
-                'Date: ${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
-                style: TextStyle(color: Constants.textHint, fontSize: 12),
+              Row(
+                children: [
+                  Icon(Icons.location_on, color: Constants.textSecondary, size: 16),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      report.address ?? "Location: ${report.latitude.toStringAsFixed(4)}, ${report.longitude.toStringAsFixed(4)}",
+                      style: TextStyle(
+                        color: Constants.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
+                    style: TextStyle(
+                      color: Constants.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
