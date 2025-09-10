@@ -202,6 +202,116 @@ class CrimeReportService {
     }
   }
 
+  static Future<Map<String, dynamic>> getMyReports({
+    String? severity,
+    String? status,
+    int page = 1,
+  }) async {
+    try {
+      print('=== GET MY REPORTS START ===');
+
+      final token = await AuthService.getAuthToken();
+      if (token == null) {
+        print('ERROR: No authentication token for getMyReports');
+        return {'success': false, 'error': 'Authentication required'};
+      }
+
+      // Build query parameters
+      final queryParams = <String, String>{'page': page.toString()};
+      if (severity != null && severity.isNotEmpty) {
+        queryParams['severity'] = severity;
+      }
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+
+      final uri = Uri.parse('$baseUrl/my-reports')
+          .replace(queryParameters: queryParams);
+
+      print('My reports URL: $uri');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('My reports status code: ${response.statusCode}');
+      print('My reports response: ${response.body}');
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        try {
+          // Handle paginated response structure - work with raw data
+          final reportsData = data['data']['data'] as List;
+
+          // Don't convert to CrimeReport objects, just cast to Map
+          List<Map<String, dynamic>> reports = reportsData
+              .map<Map<String, dynamic>>((report) {
+                print('Processing my report data: $report');
+                return Map<String, dynamic>.from(report);
+              })
+              .toList();
+
+          print('Successfully parsed ${reports.length} my reports');
+
+          return {
+            'success': true,
+            'data': {
+              'reports': reports,
+              'pagination': {
+                'current_page': data['data']['current_page'],
+                'last_page': data['data']['last_page'],
+                'total': data['data']['total'],
+                'per_page': data['data']['per_page'],
+                'from': data['data']['from'],
+                'to': data['data']['to'],
+              }
+            }
+          };
+        } catch (e) {
+          print('ERROR parsing my reports list: $e');
+          return {'success': false, 'error': 'Error parsing my reports: $e'};
+        }
+      } else if (response.statusCode == 404) {
+        // Handle 404 specifically - endpoint not found or no reports
+        print('ERROR: My reports endpoint not found (404)');
+
+        return {
+          'success': true,
+          'data': {
+            'reports': <Map<String, dynamic>>[],
+            'pagination': {
+              'current_page': 1,
+              'last_page': 1,
+              'total': 0,
+              'per_page': 10,
+              'from': null,
+              'to': null,
+            }
+          }
+        };
+      } else {
+        print('ERROR: Get my reports failed with status ${response.statusCode}');
+        return {
+          'success': false,
+          'error': data['message'] ?? 'Failed to load your reports',
+        };
+      }
+    } catch (e) {
+      print('EXCEPTION in getMyReports: $e');
+      return {
+        'success': false,
+        'error': 'Unable to connect to server. Please check your internet connection.',
+      };
+    } finally {
+      print('=== GET MY REPORTS END ===');
+    }
+  }
+
   // Add these methods to your CrimeReportService class
   static Future<Map<String, dynamic>> getReportsWithFilters({
     String? severity,
