@@ -108,3 +108,4 @@ final emaildValidator = MultiValidator([
 
 const String baseUrl = 'https://sentrisafe.net/api';
 const String storageUrl = 'https://sentrisafe.net/storage';
+const String googleApiKey = 'AIzaSyDXaFeKPaKXgpFPp0IGlJuviW2RZCM9OtU';
