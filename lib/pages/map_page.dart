@@ -5,9 +5,12 @@ import 'package:geocoding/geocoding.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../widgets/top_navbar.dart';
-import '../widgets/bottom_navbar.dart';
+
 import '../constants.dart';
+import '../models/saved_route_model.dart';
+import '../services/saved_route/saved_route_service.dart';
+import '../widgets/save_route_dialog.dart';
+import '../widgets/saved_routes_dialog.dart';
 
 class PlaceSuggestion {
   final String placeId;
@@ -88,6 +91,14 @@ class CrimeAnalysis {
       highSeverityCrimes: json['high_severity_crimes'] ?? 0,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'total_crimes_in_area': totalCrimesInArea,
+      'crimes_near_route': crimesNearRoute,
+      'high_severity_crimes': highSeverityCrimes,
+    };
+  }
 }
 
 class MapPage extends StatefulWidget {
@@ -107,6 +118,14 @@ class _MapPageState extends State<MapPage> {
   LatLng? _currentLocation;
   SaferRouteResponse? _currentSaferRoute;
   bool _isLoadingSaferRoute = false;
+
+  // Current route data for saving
+  LatLng? _currentFromLocation;
+  LatLng? _currentToLocation;
+  String? _currentPolyline;
+  String? _currentDuration;
+  String? _currentDistance;
+  bool _isCurrentRouteSafer = false;
 
   static const String apiKey = googleApiKey;
 
@@ -280,103 +299,109 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
- Future<void> _getSaferRouteFromAPI(LatLng from, LatLng to) async {
-   print('Getting safer route from $from to $to');
+  Future<void> _getSaferRouteFromAPI(LatLng from, LatLng to) async {
+    print('Getting safer route from $from to $to');
 
-   final String url = '$baseUrl/safer-route';
+    final String url = '$baseUrl/safer-route';
 
-   final Map<String, dynamic> requestBody = {
-     "start_lat": from.latitude.toString(),
-     "start_lng": from.longitude.toString(),
-     "end_lat": to.latitude.toString(),
-     "end_lng": to.longitude.toString(),
-     "radius": 5,
-     "avoid_recent_crimes": true,
-     "time_sensitivity_days": 30
-   };
+    final Map<String, dynamic> requestBody = {
+      "start_lat": from.latitude.toString(),
+      "start_lng": from.longitude.toString(),
+      "end_lat": to.latitude.toString(),
+      "end_lng": to.longitude.toString(),
+      "radius": 5,
+      "avoid_recent_crimes": true,
+      "time_sensitivity_days": 30
+    };
 
-   try {
-     final response = await http.post(
-       Uri.parse(url),
-       headers: {
-         'Content-Type': 'application/json',
-       },
-       body: json.encode(requestBody),
-     );
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(requestBody),
+      );
 
-     print('Safer route response status: ${response.statusCode}');
-     print('Safer route response body: ${response.body}');
+      print('Safer route response status: ${response.statusCode}');
+      print('Safer route response body: ${response.body}');
 
-     if (response.statusCode == 200) {
-       final data = json.decode(response.body);
-       final saferRouteResponse = SaferRouteResponse.fromJson(data);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final saferRouteResponse = SaferRouteResponse.fromJson(data);
 
-       if (saferRouteResponse.success && saferRouteResponse.polyline.isNotEmpty) {
-         print('Safer route found, updating map');
+        if (saferRouteResponse.success && saferRouteResponse.polyline.isNotEmpty) {
+          print('Safer route found, updating map');
 
-         setState(() {
-           _currentSaferRoute = saferRouteResponse;
+          setState(() {
+            _currentSaferRoute = saferRouteResponse;
+            _isCurrentRouteSafer = true;
+            _currentFromLocation = from;
+            _currentToLocation = to;
+            _currentPolyline = saferRouteResponse.polyline;
+            _currentDuration = saferRouteResponse.duration;
+            _currentDistance = saferRouteResponse.distance;
 
-           _markers = {
-             Marker(
-               markerId: const MarkerId('from'),
-               position: from,
-               infoWindow: const InfoWindow(title: 'Start'),
-               icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-             ),
-             Marker(
-               markerId: const MarkerId('to'),
-               position: to,
-               infoWindow: const InfoWindow(title: 'Destination'),
-               icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-             ),
-           };
+            _markers = {
+              Marker(
+                markerId: const MarkerId('from'),
+                position: from,
+                infoWindow: const InfoWindow(title: 'Start'),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+              ),
+              Marker(
+                markerId: const MarkerId('to'),
+                position: to,
+                infoWindow: const InfoWindow(title: 'Destination'),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+              ),
+            };
 
-           _polylines = {
-             Polyline(
-               polylineId: const PolylineId('safer_route'),
-               points: _decodePolyline(saferRouteResponse.polyline),
-               color: Constants.success,
-               width: 4,
-             ),
-           };
-         });
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('safer_route'),
+                points: _decodePolyline(saferRouteResponse.polyline),
+                color: Constants.success,
+                width: 4,
+              ),
+            };
+          });
 
-         _fitMapToRoute(from, to);
-         _showSaferRouteInfo(saferRouteResponse);
-         print('Safer route map updated successfully');
-       } else {
-         print('No safer route found');
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('No safer route found')),
-         );
-       }
-     } else if (response.statusCode == 404) {
-       // Handle 404 with message from response
-       String message = 'No safer route found';
-       try {
-         final data = json.decode(response.body);
-         if (data is Map && data['message'] != null) {
-           message = data['message'];
-         }
-       } catch (_) {}
-       print('HTTP 404: $message');
-       ScaffoldMessenger.of(context).showSnackBar(
-         SnackBar(content: Text(message)),
-       );
-     } else {
-       print('HTTP error: ${response.statusCode}');
-       ScaffoldMessenger.of(context).showSnackBar(
-         SnackBar(content: Text('Server error: ${response.statusCode}')),
-       );
-     }
-   } catch (e) {
-     print('Error getting safer route: $e');
-     ScaffoldMessenger.of(context).showSnackBar(
-       SnackBar(content: Text('Error getting safer route: $e')),
-     );
-   }
- }
+          _fitMapToRoute(from, to);
+          _showSaferRouteInfo(saferRouteResponse);
+          print('Safer route map updated successfully');
+        } else {
+          print('No safer route found');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No safer route found')),
+          );
+        }
+      } else if (response.statusCode == 404) {
+        // Handle 404 with message from response
+        String message = 'No safer route found';
+        try {
+          final data = json.decode(response.body);
+          if (data is Map && data['message'] != null) {
+            message = data['message'];
+          }
+        } catch (_) {}
+        print('HTTP 404: $message');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      } else {
+        print('HTTP error: ${response.statusCode}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Server error: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      print('Error getting safer route: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error getting safer route: $e')),
+      );
+    }
+  }
 
   void _showSaferRouteInfo(SaferRouteResponse saferRoute) {
     showModalBottomSheet(
@@ -429,11 +454,13 @@ class _MapPageState extends State<MapPage> {
                   children: [
                     Icon(Icons.route, color: Constants.primary, size: 20),
                     const SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      saferRoute.routeDescription!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Constants.textSecondary,
+                    Expanded(
+                      child: Text(
+                        saferRoute.routeDescription!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Constants.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -553,11 +580,20 @@ class _MapPageState extends State<MapPage> {
         if (data['routes'] != null && data['routes'].isNotEmpty) {
           final route = data['routes'][0];
           final polylinePoints = route['polyline']['encodedPolyline'];
+          final duration = route['duration'] ?? '';
+          final distanceMeters = route['distanceMeters'] ?? 0;
+          final distance = '${(distanceMeters / 1609.34).toStringAsFixed(1)} mi'; // Convert meters to miles
 
           print('Route found, updating map');
 
           setState(() {
             _currentSaferRoute = null; // Clear safer route info when showing regular route
+            _isCurrentRouteSafer = false;
+            _currentFromLocation = from;
+            _currentToLocation = to;
+            _currentPolyline = polylinePoints;
+            _currentDuration = duration;
+            _currentDistance = distance;
 
             _markers = {
               Marker(
@@ -604,6 +640,134 @@ class _MapPageState extends State<MapPage> {
         SnackBar(content: Text('Error getting directions: $e')),
       );
     }
+  }
+
+  Future<void> _saveCurrentRoute() async {
+    if (_currentFromLocation == null || _currentToLocation == null || _currentPolyline == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No route available to save')),
+      );
+      return;
+    }
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => SaveRouteDialog(),
+    );
+
+    if (result != null) {
+      final routeToSave = SavedRoute(
+        id: 0, // Will be assigned by server
+        name: result['name']!,
+        description: result['description'],
+        startLat: _currentFromLocation!.latitude,
+        startLng: _currentFromLocation!.longitude,
+        endLat: _currentToLocation!.latitude,
+        endLng: _currentToLocation!.longitude,
+        startAddress: _fromController.text,
+        endAddress: _toController.text,
+        polyline: _currentPolyline!,
+        safetyScore: _currentSaferRoute?.safetyScore,
+        duration: _currentDuration,
+        distance: _currentDistance,
+        crimeAnalysis: _currentSaferRoute?.crimeAnalysis,
+        isSaferRoute: _isCurrentRouteSafer,
+        routeType: _isCurrentRouteSafer ? 'safer' : 'regular',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final response = await SavedRouteService.saveRoute(routeToSave);
+
+      if (response['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message']),
+            backgroundColor: Constants.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message']),
+            backgroundColor: Constants.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showSavedRoutes() async {
+    showDialog(
+      context: context,
+      builder: (context) => SavedRoutesDialog(
+        onRouteSelected: _loadSavedRoute,
+      ),
+    );
+  }
+
+  Future<void> _loadSavedRoute(SavedRoute savedRoute) async {
+    setState(() {
+      _fromController.text = savedRoute.startAddress;
+      _toController.text = savedRoute.endAddress;
+
+      _currentFromLocation = LatLng(savedRoute.startLat, savedRoute.startLng);
+      _currentToLocation = LatLng(savedRoute.endLat, savedRoute.endLng);
+      _currentPolyline = savedRoute.polyline;
+      _currentDuration = savedRoute.duration;
+      _currentDistance = savedRoute.distance;
+      _isCurrentRouteSafer = savedRoute.isSaferRoute;
+
+      if (savedRoute.isSaferRoute && savedRoute.crimeAnalysis != null) {
+        _currentSaferRoute = SaferRouteResponse(
+          success: true,
+          polyline: savedRoute.polyline,
+          safetyScore: savedRoute.safetyScore ?? 0.0,
+          routeDescription: savedRoute.description ?? '',
+          duration: savedRoute.duration ?? '',
+          distance: savedRoute.distance ?? '',
+          crimeAnalysis: savedRoute.crimeAnalysis!,
+          alternativeRoutes: [],
+          apiUsed: 'saved',
+        );
+      } else {
+        _currentSaferRoute = null;
+      }
+
+      _markers = {
+        Marker(
+          markerId: const MarkerId('from'),
+          position: _currentFromLocation!,
+          infoWindow: const InfoWindow(title: 'Start'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        ),
+        Marker(
+          markerId: const MarkerId('to'),
+          position: _currentToLocation!,
+          infoWindow: const InfoWindow(title: 'Destination'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        ),
+      };
+
+      _polylines = {
+        Polyline(
+          polylineId: const PolylineId('saved_route'),
+          points: _decodePolyline(savedRoute.polyline),
+          color: savedRoute.isSaferRoute ? Constants.success : Constants.primary,
+          width: 4,
+        ),
+      };
+    });
+
+    _fitMapToRoute(_currentFromLocation!, _currentToLocation!);
+    Navigator.of(context).pop(); // Close the saved routes dialog
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Loaded saved route: ${savedRoute.name}'),
+        backgroundColor: Constants.success,
+      ),
+    );
   }
 
   List<LatLng> _decodePolyline(String polyline) {
@@ -750,6 +914,12 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  bool _hasCurrentRoute() {
+    return _currentFromLocation != null &&
+        _currentToLocation != null &&
+        _currentPolyline != null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -772,6 +942,8 @@ class _MapPageState extends State<MapPage> {
                   prefixIcon: Icons.location_on,
                 ),
                 const SizedBox(height: AppConstants.spacingS),
+
+                // Main action buttons row
                 Row(
                   children: [
                     Expanded(
@@ -825,6 +997,65 @@ class _MapPageState extends State<MapPage> {
                     ),
                   ],
                 ),
+
+                const SizedBox(height: AppConstants.spacingS),
+
+                // Secondary buttons row
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _hasCurrentRoute() ? _saveCurrentRoute : null,
+                        icon: Icon(
+                          Icons.bookmark_add,
+                          color: _hasCurrentRoute() ? Constants.primary : Constants.greyDark,
+                          size: 18,
+                        ),
+                        label: Text(
+                          'Save Route',
+                          style: TextStyle(
+                            color: _hasCurrentRoute() ? Constants.primary : Constants.greyDark,
+                            fontSize: 13,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          side: BorderSide(
+                            color: _hasCurrentRoute() ? Constants.primary : Constants.greyDark,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _showSavedRoutes,
+                        icon: Icon(
+                          Icons.bookmark,
+                          color: Constants.accent,
+                          size: 18,
+                        ),
+                        label: Text(
+                          'Saved Routes',
+                          style: TextStyle(
+                            color: Constants.accent,
+                            fontSize: 13,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          side: BorderSide(color: Constants.accent),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -857,3 +1088,4 @@ class _MapPageState extends State<MapPage> {
     );
   }
 }
+
