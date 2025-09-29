@@ -4,8 +4,14 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:sentrisafe/constants.dart';
 import 'package:sentrisafe/services/auth/auth_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class ProfileService {
+  static Future<bool> _isConnected() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
   static Future<Map<String, String>> _getAuthHeaders() async {
     final token = await AuthService.getAuthToken();
     return {
@@ -15,6 +21,12 @@ class ProfileService {
   }
 
   static Future<Map<String, dynamic>> getProfile() async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'error': 'No internet connection',
+      };
+    }
     try {
       final headers = await _getAuthHeaders();
 
@@ -49,6 +61,12 @@ class ProfileService {
     required String email,
     File? profilePicture,
   }) async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'error': 'No internet connection',
+      };
+    }
     try {
       final token = await AuthService.getAuthToken();
       var uri = Uri.parse('$baseUrl/profile');
@@ -101,6 +119,12 @@ class ProfileService {
   }
 
   static Future<Map<String, dynamic>> uploadProfileImage(File image) async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'error': 'No internet connection',
+      };
+    }
     try {
       final token = await AuthService.getAuthToken();
       var uri = Uri.parse('$baseUrl/profile/upload-image');
@@ -148,6 +172,12 @@ class ProfileService {
   }
 
   static Future<Map<String, dynamic>> resetProfileImage() async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'error': 'No internet connection',
+      };
+    }
     try {
       final headers = await _getAuthHeaders();
 
@@ -178,6 +208,12 @@ class ProfileService {
   }
 
   static Future<Map<String, dynamic>> deleteAccount() async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'error': 'No internet connection',
+      };
+    }
     try {
       final headers = await _getAuthHeaders();
 

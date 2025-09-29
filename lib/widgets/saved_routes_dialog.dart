@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../models/saved_route_model.dart';
-import '../services/saved_route/saved_route_service.dart';
+import '../services/route_database_helper.dart';
+import 'dart:convert';
+import '../pages/map_page.dart'; // For CrimeAnalysis
 
 class SavedRoutesDialog extends StatefulWidget {
   final Function(SavedRoute) onRouteSelected;
@@ -22,13 +24,11 @@ class _SavedRoutesDialogState extends State<SavedRoutesDialog> {
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedFilter = 'all'; // 'all', 'safer', 'regular'
-  SavedRouteStats? _stats;
 
   @override
   void initState() {
     super.initState();
     _loadSavedRoutes();
-    _loadStats();
     _searchController.addListener(_filterRoutes);
   }
 
@@ -45,13 +45,30 @@ class _SavedRoutesDialogState extends State<SavedRoutesDialog> {
     });
 
     try {
-      final response = await SavedRouteService.getSavedRoutes(
-        type: _selectedFilter == 'all' ? null : _selectedFilter,
-      );
-
+      final routeModels = await RouteDatabaseHelper().getRoutes();
+      final routes = routeModels.map((model) => SavedRoute(
+        id: model.id ?? 0,
+        name: model.name,
+        description: model.description,
+        startLat: model.startLat,
+        startLng: model.startLng,
+        endLat: model.endLat,
+        endLng: model.endLng,
+        startAddress: model.startAddress,
+        endAddress: model.endAddress,
+        polyline: model.polyline,
+        safetyScore: model.safetyScore,
+        duration: model.duration,
+        distance: model.distance,
+        crimeAnalysis: model.crimeAnalysisJson != null ? CrimeAnalysis.fromJson(jsonDecode(model.crimeAnalysisJson!)) : null,
+        isSaferRoute: model.isSaferRoute,
+        routeType: model.routeType,
+        createdAt: DateTime.parse(model.createdAt),
+        updatedAt: DateTime.parse(model.updatedAt),
+      )).toList();
       setState(() {
-        _savedRoutes = response.data;
-        _filteredRoutes = response.data;
+        _savedRoutes = routes;
+        _filteredRoutes = routes;
         _isLoading = false;
       });
     } catch (e) {
@@ -59,19 +76,6 @@ class _SavedRoutesDialogState extends State<SavedRoutesDialog> {
         _errorMessage = 'Failed to load saved routes: $e';
         _isLoading = false;
       });
-    }
-  }
-
-  Future<void> _loadStats() async {
-    try {
-      final response = await SavedRouteService.getRouteStats();
-      if (response['success']) {
-        setState(() {
-          _stats = response['data'];
-        });
-      }
-    } catch (e) {
-      print('Failed to load stats: $e');
     }
   }
 
@@ -115,86 +119,24 @@ class _SavedRoutesDialogState extends State<SavedRoutesDialog> {
     );
 
     if (confirm == true) {
-      final response = await SavedRouteService.deleteRoute(route.id);
-      if (response['success']) {
+      try {
+        await RouteDatabaseHelper().deleteRoute(route.id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(response['message']),
+            content: Text('Route deleted.'),
             backgroundColor: Constants.success,
           ),
         );
         _loadSavedRoutes();
-        _loadStats();
-      } else {
+      } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(response['message']),
+            content: Text('Failed to delete route: $e'),
             backgroundColor: Constants.error,
           ),
         );
       }
     }
-  }
-
-  Widget _buildStatsCard() {
-    if (_stats == null) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppConstants.spacingM),
-      padding: const EdgeInsets.all(AppConstants.spacingM),
-      decoration: BoxDecoration(
-        color: Constants.background,
-        borderRadius: BorderRadius.circular(AppConstants.radiusM),
-        border: Border.all(color: Constants.greyDark),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Route Statistics',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Constants.textPrimary,
-            ),
-          ),
-          const SizedBox(height: AppConstants.spacingS),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem('Total', _stats!.totalRoutes.toString(), Icons.route),
-              _buildStatItem('Safer', _stats!.saferRoutes.toString(), Icons.security),
-              _buildStatItem('Regular', _stats!.regularRoutes.toString(), Icons.directions),
-              if (_stats!.avgSafetyScore != null)
-                _buildStatItem('Avg Safety', _stats!.avgSafetyScore!.toStringAsFixed(1), Icons.star),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: Constants.primary, size: 20),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Constants.textPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Constants.textSecondary,
-          ),
-        ),
-      ],
-    );
   }
 
   Widget _buildFilterChips() {
@@ -404,10 +346,7 @@ class _SavedRoutesDialogState extends State<SavedRoutesDialog> {
           actions: [
             IconButton(
               icon: Icon(Icons.refresh, color: Constants.primary),
-              onPressed: () {
-                _loadSavedRoutes();
-                _loadStats();
-              },
+              onPressed: _loadSavedRoutes,
             ),
           ],
         ),
@@ -415,8 +354,6 @@ class _SavedRoutesDialogState extends State<SavedRoutesDialog> {
           padding: const EdgeInsets.all(AppConstants.spacingM),
           child: Column(
             children: [
-              // Statistics card
-              _buildStatsCard(),
 
               // Search field
               TextField(

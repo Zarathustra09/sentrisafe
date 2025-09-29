@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../constants.dart';
 import '../models/saved_route_model.dart';
-import '../services/saved_route/saved_route_service.dart';
+import '../services/route_database_helper.dart';
 import '../widgets/save_route_dialog.dart';
 import '../widgets/saved_routes_dialog.dart';
 
@@ -656,8 +656,8 @@ class _MapPageState extends State<MapPage> {
     );
 
     if (result != null) {
-      final routeToSave = SavedRoute(
-        id: 0, // Will be assigned by server
+      final now = DateTime.now();
+      final routeToSave = RouteModel(
         name: result['name']!,
         description: result['description'],
         startLat: _currentFromLocation!.latitude,
@@ -670,27 +670,26 @@ class _MapPageState extends State<MapPage> {
         safetyScore: _currentSaferRoute?.safetyScore,
         duration: _currentDuration,
         distance: _currentDistance,
-        crimeAnalysis: _currentSaferRoute?.crimeAnalysis,
+        crimeAnalysisJson: _currentSaferRoute?.crimeAnalysis != null ? jsonEncode(_currentSaferRoute!.crimeAnalysis.toJson()) : null,
         isSaferRoute: _isCurrentRouteSafer,
         routeType: _isCurrentRouteSafer ? 'safer' : 'regular',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+        createdAt: now.toIso8601String(),
+        updatedAt: now.toIso8601String(),
       );
 
-      final response = await SavedRouteService.saveRoute(routeToSave);
-
-      if (response['success']) {
+      try {
+        await RouteDatabaseHelper().insertRoute(routeToSave);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message']),
-            backgroundColor: Constants.success,
+          const SnackBar(
+            content: Text('Route saved locally for offline use!'),
+            backgroundColor: Colors.green,
           ),
         );
-      } else {
+      } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(response['message']),
-            backgroundColor: Constants.error,
+            content: Text('Failed to save route: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }

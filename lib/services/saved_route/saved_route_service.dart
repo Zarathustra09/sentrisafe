@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../models/saved_route_model.dart';
 import '../../constants.dart';
 import '../auth/auth_service.dart';
@@ -14,12 +15,25 @@ class SavedRouteService {
     };
   }
 
+  static Future<bool> _isConnected() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
   /// Get all saved routes for the authenticated user
   static Future<SavedRouteResponse> getSavedRoutes({
     int page = 1,
     String? type,
     String? search,
   }) async {
+    if (!await _isConnected()) {
+      return SavedRouteResponse(
+        success: false,
+        data: [],
+        message: 'No internet connection',
+      );
+    }
+
     try {
       final uri = Uri.parse('$baseUrl/saved-routes').replace(
         queryParameters: {
@@ -51,6 +65,13 @@ class SavedRouteService {
 
   /// Save a new route
   static Future<Map<String, dynamic>> saveRoute(SavedRoute route) async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'message': 'No internet connection',
+      };
+    }
+
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/saved-routes'),
@@ -86,6 +107,13 @@ class SavedRouteService {
 
   /// Get a specific saved route by ID
   static Future<Map<String, dynamic>> getSavedRoute(int id) async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'message': 'No internet connection',
+      };
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/saved-routes/$id'),
@@ -120,6 +148,13 @@ class SavedRouteService {
     String? name,
     String? description,
   }) async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'message': 'No internet connection',
+      };
+    }
+
     try {
       final Map<String, dynamic> updateData = {};
       if (name != null) updateData['name'] = name;
@@ -157,6 +192,13 @@ class SavedRouteService {
 
   /// Delete a saved route
   static Future<Map<String, dynamic>> deleteRoute(int id) async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'message': 'No internet connection',
+      };
+    }
+
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/saved-routes/$id'),
@@ -188,6 +230,13 @@ class SavedRouteService {
 
   /// Get route statistics
   static Future<Map<String, dynamic>> getRouteStats() async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'message': 'No internet connection',
+      };
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/saved-routes-stats'),

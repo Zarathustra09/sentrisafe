@@ -1,11 +1,21 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:sentrisafe/constants.dart';
 import 'package:sentrisafe/models/announcement_model.dart';
 import 'package:sentrisafe/services/auth/auth_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AnnouncementService {
+  static Future<bool> _isConnected() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
   static Future<Map<String, dynamic>> getAnnouncements({int page = 1}) async {
+    if (!await _isConnected()) {
+      return {'success': false, 'error': 'No internet connection'};
+    }
     try {
       final token = await AuthService.getAuthToken();
       if (token == null) {
@@ -45,6 +55,9 @@ class AnnouncementService {
         };
       }
     } catch (e) {
+      if (e is SocketException) {
+        return {'success': false, 'error': 'No internet connection'};
+      }
       return {
         'success': false,
         'error': 'Network error: ${e.toString()}'
@@ -53,6 +66,9 @@ class AnnouncementService {
   }
 
   static Future<Map<String, dynamic>> getAnnouncementById(int id) async {
+    if (!await _isConnected()) {
+      return {'success': false, 'error': 'No internet connection'};
+    }
     try {
       final token = await AuthService.getAuthToken();
       if (token == null) {
@@ -84,6 +100,9 @@ class AnnouncementService {
         };
       }
     } catch (e) {
+      if (e is SocketException) {
+        return {'success': false, 'error': 'No internet connection'};
+      }
       return {
         'success': false,
         'error': 'Network error: ${e.toString()}'

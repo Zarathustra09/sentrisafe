@@ -2,11 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../constants.dart';
 import '../../models/crime_report_model.dart';
 import '../auth/auth_service.dart';
 
 class CrimeReportService {
+  static Future<bool> _isConnected() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
   static Future<Map<String, dynamic>> submitReport({
     required String title,
     String? description,
@@ -17,6 +23,12 @@ class CrimeReportService {
     required DateTime incidentDate,
     File? reportImage,
   }) async {
+    if (!await _isConnected()) {
+      return {
+        'success': false,
+        'errors': {'general': 'No internet connection'},
+      };
+    }
     try {
       print('=== CRIME REPORT SUBMISSION START ===');
 
@@ -138,10 +150,12 @@ class CrimeReportService {
         };
       }
     } catch (e) {
-      print('EXCEPTION in submitReport: $e');
-      print('Exception type: ${e.runtimeType}');
-      print('Stack trace: ${StackTrace.current}');
-
+      if (e is SocketException) {
+        return {
+          'success': false,
+          'errors': {'general': 'No internet connection'},
+        };
+      }
       return {
         'success': false,
         'errors': {'general': 'Network error: ${e.toString()}'},
@@ -152,6 +166,9 @@ class CrimeReportService {
   }
 
   static Future<Map<String, dynamic>> getReports() async {
+    if (!await _isConnected()) {
+      return {'success': false, 'error': 'No internet connection'};
+    }
     try {
       print('=== GET REPORTS START ===');
 
@@ -197,7 +214,9 @@ class CrimeReportService {
         return {'success': false, 'error': data['error'] ?? 'Failed to load reports'};
       }
     } catch (e) {
-      print('EXCEPTION in getReports: $e');
+      if (e is SocketException) {
+        return {'success': false, 'error': 'No internet connection'};
+      }
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     } finally {
       print('=== GET REPORTS END ===');
@@ -209,6 +228,9 @@ class CrimeReportService {
     String? status,
     int page = 1,
   }) async {
+    if (!await _isConnected()) {
+      return {'success': false, 'error': 'No internet connection'};
+    }
     try {
       print('=== GET MY REPORTS START ===');
 
@@ -304,7 +326,9 @@ class CrimeReportService {
         };
       }
     } catch (e) {
-      print('EXCEPTION in getMyReports: $e');
+      if (e is SocketException) {
+        return {'success': false, 'error': 'No internet connection'};
+      }
       return {
         'success': false,
         'error': 'Unable to connect to server. Please check your internet connection.',
@@ -323,6 +347,9 @@ class CrimeReportService {
     double? radius,
     int page = 1,
   }) async {
+    if (!await _isConnected()) {
+      return {'success': false, 'error': 'No internet connection'};
+    }
     try {
       print('=== GET REPORTS WITH FILTERS START ===');
 
@@ -379,7 +406,9 @@ class CrimeReportService {
         return {'success': false, 'error': data['error'] ?? 'Failed to load reports'};
       }
     } catch (e) {
-      print('EXCEPTION in getReportsWithFilters: $e');
+      if (e is SocketException) {
+        return {'success': false, 'error': 'No internet connection'};
+      }
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     } finally {
       print('=== GET REPORTS WITH FILTERS END ===');
