@@ -20,12 +20,6 @@ class TopNavbar extends StatelessWidget {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.search, color: Constants.textSecondary),
-          onPressed: () {
-            // Handle search functionality
-          },
-        ),
-        IconButton(
           icon: Icon(Icons.account_circle, color: Constants.textSecondary),
           onPressed: () {
             Navigator.of(
