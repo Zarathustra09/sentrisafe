@@ -114,25 +114,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
               child: Column(
                 children: [
                   SizedBox(height: constraints.maxHeight * 0.08),
-                  Container(
+                  Image.asset(
+                    'lib/assets/logo.png',
                     width: 100,
                     height: 100,
-                    decoration: BoxDecoration(
-                      color: Constants.white,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusL),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Constants.black.withOpacity(0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.shield_outlined,
-                      size: 60,
-                      color: Constants.primary,
-                    ),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.08),
                   Text(
@@ -347,3 +332,4 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 }
+

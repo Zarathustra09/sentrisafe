@@ -84,11 +84,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.shield_outlined,
-                      size: 60,
-                      color: Constants.primary,
-                    ),
+                    child: Image.asset('lib/assets/logo.png', width: 48, height: 48),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.1),
                   Text(
