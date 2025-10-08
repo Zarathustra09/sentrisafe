@@ -22,6 +22,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _retypePasswordController = TextEditingController();
   File? _idImage;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureRetypePassword = true;
 
   @override
   void dispose() {
@@ -110,25 +112,20 @@ class _RegistrationPageState extends State<RegistrationPage> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.spacingM,
+              ),
               child: Column(
                 children: [
                   SizedBox(height: constraints.maxHeight * 0.08),
-                  Image.asset(
-                    'lib/assets/logo.png',
-                    width: 100,
-                    height: 100,
-                  ),
+                  Image.asset('lib/assets/logo.png', width: 100, height: 100),
                   SizedBox(height: constraints.maxHeight * 0.08),
                   Text(
                     "Create Account",
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall!
-                        .copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Constants.textPrimary,
-                        ),
+                    style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Constants.textPrimary,
+                    ),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.04),
                   Form(
@@ -142,15 +139,21 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             filled: true,
                             fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                              horizontal: AppConstants.spacingM * 1.5,
+                              vertical: AppConstants.spacingM,
+                            ),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(AppConstants.radiusXL),
+                              ),
                             ),
                             hintStyle: TextStyle(color: Constants.textHint),
                           ),
                           style: const TextStyle(color: Constants.textPrimary),
-                          validator: RequiredValidator(errorText: 'Name is required').call,
+                          validator: RequiredValidator(
+                            errorText: 'Name is required',
+                          ).call,
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
@@ -160,10 +163,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             filled: true,
                             fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                              horizontal: AppConstants.spacingM * 1.5,
+                              vertical: AppConstants.spacingM,
+                            ),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(AppConstants.radiusXL),
+                              ),
                             ),
                             hintStyle: TextStyle(color: Constants.textHint),
                           ),
@@ -179,32 +186,55 @@ class _RegistrationPageState extends State<RegistrationPage> {
                             filled: true,
                             fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                              horizontal: AppConstants.spacingM * 1.5,
+                              vertical: AppConstants.spacingM,
+                            ),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(AppConstants.radiusXL),
+                              ),
                             ),
                             hintStyle: TextStyle(color: Constants.textHint),
                           ),
                           keyboardType: TextInputType.phone,
                           style: const TextStyle(color: Constants.textPrimary),
-                          validator: RequiredValidator(errorText: 'Phone is required').call,
+                          validator: RequiredValidator(
+                            errorText: 'Phone is required',
+                          ).call,
                         ),
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
                           controller: _passwordController,
-                          obscureText: true,
+                          obscureText: _obscurePassword,
                           decoration: InputDecoration(
                             hintText: 'Password',
                             filled: true,
                             fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                              horizontal: AppConstants.spacingM * 1.5,
+                              vertical: AppConstants.spacingM,
+                            ),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(AppConstants.radiusXL),
+                              ),
                             ),
                             hintStyle: TextStyle(color: Constants.textHint),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Constants.textSecondary,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
                           ),
                           style: const TextStyle(color: Constants.textPrimary),
                           validator: passwordValidator.call,
@@ -212,18 +242,36 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         SizedBox(height: AppConstants.spacingM),
                         TextFormField(
                           controller: _retypePasswordController,
-                          obscureText: true,
+                          obscureText: _obscureRetypePassword,
                           decoration: InputDecoration(
                             hintText: 'Retype Password',
                             filled: true,
                             fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                              horizontal: AppConstants.spacingM * 1.5,
+                              vertical: AppConstants.spacingM,
+                            ),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(AppConstants.radiusXL),
+                              ),
                             ),
                             hintStyle: TextStyle(color: Constants.textHint),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureRetypePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Constants.textSecondary,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureRetypePassword =
+                                      !_obscureRetypePassword;
+                                });
+                              },
+                            ),
                           ),
                           style: const TextStyle(color: Constants.textPrimary),
                           validator: _validateRetypePassword,
@@ -233,28 +281,39 @@ class _RegistrationPageState extends State<RegistrationPage> {
                         Container(
                           decoration: BoxDecoration(
                             color: Constants.surface,
-                            borderRadius: BorderRadius.circular(AppConstants.radiusXL),
+                            borderRadius: BorderRadius.circular(
+                              AppConstants.radiusXL,
+                            ),
                           ),
                           child: InkWell(
                             onTap: _pickImage,
-                            borderRadius: BorderRadius.circular(AppConstants.radiusXL),
+                            borderRadius: BorderRadius.circular(
+                              AppConstants.radiusXL,
+                            ),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: AppConstants.spacingM * 1.5,
-                                  vertical: AppConstants.spacingM),
+                                horizontal: AppConstants.spacingM * 1.5,
+                                vertical: AppConstants.spacingM,
+                              ),
                               child: Row(
                                 children: [
                                   Icon(
                                     Icons.camera_alt,
-                                    color: _idImage == null ? Constants.textHint : Constants.primary,
+                                    color: _idImage == null
+                                        ? Constants.textHint
+                                        : Constants.primary,
                                     size: 24,
                                   ),
                                   SizedBox(width: AppConstants.spacingM),
                                   Expanded(
                                     child: Text(
-                                      _idImage == null ? 'Valid ID' : 'ID Image Selected',
+                                      _idImage == null
+                                          ? 'Valid ID'
+                                          : 'ID Image Selected',
                                       style: TextStyle(
-                                        color: _idImage == null ? Constants.textHint : Constants.primary,
+                                        color: _idImage == null
+                                            ? Constants.textHint
+                                            : Constants.primary,
                                         fontSize: 16,
                                       ),
                                     ),
@@ -264,7 +323,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                       width: 40,
                                       height: 40,
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                                        borderRadius: BorderRadius.circular(
+                                          AppConstants.radiusS,
+                                        ),
                                         image: DecorationImage(
                                           image: FileImage(_idImage!),
                                           fit: BoxFit.cover,
@@ -292,7 +353,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Constants.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Constants.white,
+                                    ),
                                   ),
                                 )
                               : const Text("Sign Up"),
@@ -312,12 +375,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 ),
                               ],
                             ),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium!
-                                .copyWith(
-                                  color: Constants.textSecondary,
-                                ),
+                            style: Theme.of(context).textTheme.bodyMedium!
+                                .copyWith(color: Constants.textSecondary),
                           ),
                         ),
                       ],
@@ -332,4 +391,3 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 }
-

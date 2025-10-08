@@ -16,6 +16,7 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -66,7 +67,9 @@ class _LoginPageState extends State<LoginPage> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.spacingM,
+              ),
               child: Column(
                 children: [
                   SizedBox(height: constraints.maxHeight * 0.1),
@@ -84,18 +87,19 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    child: Image.asset('lib/assets/logo.png', width: 48, height: 48),
+                    child: Image.asset(
+                      'lib/assets/logo.png',
+                      width: 48,
+                      height: 48,
+                    ),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.1),
                   Text(
                     "Sign In",
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall!
-                        .copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Constants.textPrimary,
-                        ),
+                    style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Constants.textPrimary,
+                    ),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.05),
                   Form(
@@ -109,10 +113,14 @@ class _LoginPageState extends State<LoginPage> {
                             filled: true,
                             fillColor: Constants.surface,
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                              horizontal: AppConstants.spacingM * 1.5,
+                              vertical: AppConstants.spacingM,
+                            ),
                             border: const OutlineInputBorder(
                               borderSide: BorderSide.none,
-                              borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(AppConstants.radiusXL),
+                              ),
                             ),
                             hintStyle: TextStyle(color: Constants.textHint),
                           ),
@@ -121,24 +129,47 @@ class _LoginPageState extends State<LoginPage> {
                           validator: emaildValidator.call,
                         ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: AppConstants.spacingM),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppConstants.spacingM,
+                          ),
                           child: TextFormField(
                             controller: _passwordController,
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             decoration: InputDecoration(
                               hintText: 'Password',
                               filled: true,
                               fillColor: Constants.surface,
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: AppConstants.spacingM * 1.5, vertical: AppConstants.spacingM),
+                                horizontal: AppConstants.spacingM * 1.5,
+                                vertical: AppConstants.spacingM,
+                              ),
                               border: const OutlineInputBorder(
                                 borderSide: BorderSide.none,
-                                borderRadius: BorderRadius.all(Radius.circular(AppConstants.radiusXL)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(AppConstants.radiusXL),
+                                ),
                               ),
                               hintStyle: TextStyle(color: Constants.textHint),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Constants.textSecondary,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
                             ),
-                            style: const TextStyle(color: Constants.textPrimary),
-                            validator: RequiredValidator(errorText: 'Password is required').call,
+                            style: const TextStyle(
+                              color: Constants.textPrimary,
+                            ),
+                            validator: RequiredValidator(
+                              errorText: 'Password is required',
+                            ).call,
                           ),
                         ),
                         ElevatedButton(
@@ -156,7 +187,9 @@ class _LoginPageState extends State<LoginPage> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Constants.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Constants.white,
+                                    ),
                                   ),
                                 )
                               : const Text("Sign in"),
@@ -166,12 +199,8 @@ class _LoginPageState extends State<LoginPage> {
                           onPressed: () {},
                           child: Text(
                             'Forgot Password?',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium!
-                                .copyWith(
-                                  color: Constants.textSecondary,
-                                ),
+                            style: Theme.of(context).textTheme.bodyMedium!
+                                .copyWith(color: Constants.textSecondary),
                           ),
                         ),
                         TextButton(
@@ -188,12 +217,8 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ],
                             ),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium!
-                                .copyWith(
-                                  color: Constants.textSecondary,
-                                ),
+                            style: Theme.of(context).textTheme.bodyMedium!
+                                .copyWith(color: Constants.textSecondary),
                           ),
                         ),
                       ],
