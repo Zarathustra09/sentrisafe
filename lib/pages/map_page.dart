@@ -8,7 +8,9 @@ import 'package:http/http.dart' as http;
 
 import '../constants.dart';
 import '../models/saved_route_model.dart';
+import '../models/crime_report_model.dart';
 import '../services/route_database_helper.dart';
+import '../services/crime_report/crime_report_service.dart';
 import '../widgets/save_route_dialog.dart';
 import '../widgets/saved_routes_dialog.dart';
 
@@ -119,6 +121,11 @@ class _MapPageState extends State<MapPage> {
   SaferRouteResponse? _currentSaferRoute;
   bool _isLoadingSaferRoute = false;
 
+  // Add these new variables for crime reports
+  List<CrimeReport> _crimeReports = [];
+  bool _showCrimeReports = true;
+  bool _isLoadingCrimeReports = false;
+
   // Current route data for saving
   LatLng? _currentFromLocation;
   LatLng? _currentToLocation;
@@ -133,6 +140,195 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    _loadCrimeReports();
+  }
+
+  // Add method to load crime reports
+  Future<void> _loadCrimeReports() async {
+    setState(() {
+      _isLoadingCrimeReports = true;
+    });
+
+    try {
+      final result = await CrimeReportService.getReports();
+      if (result['success'] == true) {
+        setState(() {
+          _crimeReports = result['reports'] ?? [];
+          _updateMapMarkers();
+        });
+      } else {
+        print('Failed to load crime reports: ${result['error']}');
+      }
+    } catch (e) {
+      print('Error loading crime reports: $e');
+    } finally {
+      setState(() {
+        _isLoadingCrimeReports = false;
+      });
+    }
+  }
+
+  // Add method to get marker color based on severity
+  BitmapDescriptor _getCrimeMarkerIcon(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'high':
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+      case 'medium':
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+      case 'low':
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+      default:
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
+    }
+  }
+
+  // Add method to update map markers
+  void _updateMapMarkers() {
+    Set<Marker> newMarkers = {};
+
+    // Add route markers if they exist
+    if (_currentFromLocation != null && _currentToLocation != null) {
+      newMarkers.addAll({
+        Marker(
+          markerId: const MarkerId('from'),
+          position: _currentFromLocation!,
+          infoWindow: const InfoWindow(title: 'Start'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        ),
+        Marker(
+          markerId: const MarkerId('to'),
+          position: _currentToLocation!,
+          infoWindow: const InfoWindow(title: 'Destination'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        ),
+      });
+    }
+
+    // Add crime report markers if enabled
+    if (_showCrimeReports) {
+      for (final crime in _crimeReports) {
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId('crime_${crime.id}'),
+            position: LatLng(crime.latitude, crime.longitude),
+            icon: _getCrimeMarkerIcon(crime.severity),
+            infoWindow: InfoWindow(
+              title: crime.title,
+              snippet: '${crime.severity.toUpperCase()} severity\n${crime.address ?? 'No address'}',
+            ),
+            onTap: () => _showCrimeDetails(crime),
+          ),
+        );
+      }
+    }
+
+    setState(() {
+      _markers = newMarkers;
+    });
+  }
+
+  // Add method to show crime details
+  void _showCrimeDetails(CrimeReport crime) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Constants.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.radiusM),
+        ),
+        title: Text(
+          crime.title,
+          style: TextStyle(
+            color: Constants.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildCrimeDetailRow(
+              'Severity',
+              crime.severity.toUpperCase(),
+              _getSeverityColor(crime.severity),
+            ),
+            const SizedBox(height: AppConstants.spacingS),
+            if (crime.description != null && crime.description!.isNotEmpty) ...[
+              _buildCrimeDetailRow('Description', crime.description!, Constants.textSecondary),
+              const SizedBox(height: AppConstants.spacingS),
+            ],
+            if (crime.address != null && crime.address!.isNotEmpty) ...[
+              _buildCrimeDetailRow('Address', crime.address!, Constants.textSecondary),
+              const SizedBox(height: AppConstants.spacingS),
+            ],
+            _buildCrimeDetailRow(
+              'Date',
+              _formatDate(crime.incidentDate),
+              Constants.textSecondary,
+            ),
+            const SizedBox(height: AppConstants.spacingS),
+            _buildCrimeDetailRow(
+              'Location',
+              '${crime.latitude.toStringAsFixed(4)}, ${crime.longitude.toStringAsFixed(4)}',
+              Constants.textSecondary,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Close',
+              style: TextStyle(color: Constants.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCrimeDetailRow(String label, String value, Color valueColor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              color: Constants.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: valueColor,
+              fontWeight: label == 'Severity' ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'high':
+        return Constants.error;
+      case 'medium':
+        return Constants.warning;
+      case 'low':
+        return Constants.success;
+      default:
+        return Constants.textSecondary;
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   Future<void> _getCurrentLocation() async {
@@ -342,21 +538,6 @@ class _MapPageState extends State<MapPage> {
             _currentDuration = saferRouteResponse.duration;
             _currentDistance = saferRouteResponse.distance;
 
-            _markers = {
-              Marker(
-                markerId: const MarkerId('from'),
-                position: from,
-                infoWindow: const InfoWindow(title: 'Start'),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-              ),
-              Marker(
-                markerId: const MarkerId('to'),
-                position: to,
-                infoWindow: const InfoWindow(title: 'Destination'),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-              ),
-            };
-
             _polylines = {
               Polyline(
                 polylineId: const PolylineId('safer_route'),
@@ -367,6 +548,7 @@ class _MapPageState extends State<MapPage> {
             };
           });
 
+          _updateMapMarkers();
           _fitMapToRoute(from, to);
           _showSaferRouteInfo(saferRouteResponse);
           print('Safer route map updated successfully');
@@ -438,7 +620,7 @@ class _MapPageState extends State<MapPage> {
                     Icon(Icons.star, color: Constants.warning, size: 20),
                     const SizedBox(width: AppConstants.spacingS),
                     Text(
-                      'Safety Score: ${saferRoute.safetyScore!.toStringAsFixed(1)}/5.0',
+                      'Safety Score: ${saferRoute.safetyScore.toStringAsFixed(1)}/5.0',
                       style: TextStyle(
                         fontSize: 16,
                         color: Constants.textPrimary,
@@ -449,14 +631,14 @@ class _MapPageState extends State<MapPage> {
                 ),
                 const SizedBox(height: AppConstants.spacingS),
               ],
-              if (saferRoute.routeDescription != null) ...[
+              if (saferRoute.routeDescription.isNotEmpty) ...[
                 Row(
                   children: [
                     Icon(Icons.route, color: Constants.primary, size: 20),
                     const SizedBox(width: AppConstants.spacingS),
                     Expanded(
                       child: Text(
-                        saferRoute.routeDescription!,
+                        saferRoute.routeDescription,
                         style: TextStyle(
                           fontSize: 14,
                           color: Constants.textSecondary,
@@ -467,13 +649,13 @@ class _MapPageState extends State<MapPage> {
                 ),
                 const SizedBox(height: AppConstants.spacingS),
               ],
-              if (saferRoute.duration != null && saferRoute.distance != null) ...[
+              if (saferRoute.duration.isNotEmpty && saferRoute.distance.isNotEmpty) ...[
                 Row(
                   children: [
                     Icon(Icons.access_time, color: Constants.accent, size: 20),
                     const SizedBox(width: AppConstants.spacingS),
                     Text(
-                      '${saferRoute.duration!} • ${saferRoute.distance!}',
+                      '${saferRoute.duration} • ${saferRoute.distance}',
                       style: TextStyle(
                         fontSize: 14,
                         color: Constants.textSecondary,
@@ -483,41 +665,39 @@ class _MapPageState extends State<MapPage> {
                 ),
                 const SizedBox(height: AppConstants.spacingM),
               ],
-              if (saferRoute.crimeAnalysis != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(AppConstants.spacingM),
-                  decoration: BoxDecoration(
-                    color: Constants.background,
-                    borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Crime Analysis',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Constants.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: AppConstants.spacingS),
-                      Text(
-                        'Total crimes in area: ${saferRoute.crimeAnalysis!.totalCrimesInArea}',
-                        style: TextStyle(color: Constants.textSecondary),
-                      ),
-                      Text(
-                        'Crimes near route: ${saferRoute.crimeAnalysis!.crimesNearRoute}',
-                        style: TextStyle(color: Constants.textSecondary),
-                      ),
-                      Text(
-                        'High severity crimes: ${saferRoute.crimeAnalysis!.highSeverityCrimes}',
-                        style: TextStyle(color: Constants.error),
-                      ),
-                    ],
-                  ),
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingM),
+                decoration: BoxDecoration(
+                  color: Constants.background,
+                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
                 ),
-              ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Crime Analysis',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Constants.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppConstants.spacingS),
+                    Text(
+                      'Total crimes in area: ${saferRoute.crimeAnalysis.totalCrimesInArea}',
+                      style: TextStyle(color: Constants.textSecondary),
+                    ),
+                    Text(
+                      'Crimes near route: ${saferRoute.crimeAnalysis.crimesNearRoute}',
+                      style: TextStyle(color: Constants.textSecondary),
+                    ),
+                    Text(
+                      'High severity crimes: ${saferRoute.crimeAnalysis.highSeverityCrimes}',
+                      style: TextStyle(color: Constants.error),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         );
@@ -595,21 +775,6 @@ class _MapPageState extends State<MapPage> {
             _currentDuration = duration;
             _currentDistance = distance;
 
-            _markers = {
-              Marker(
-                markerId: const MarkerId('from'),
-                position: from,
-                infoWindow: const InfoWindow(title: 'Start'),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-              ),
-              Marker(
-                markerId: const MarkerId('to'),
-                position: to,
-                infoWindow: const InfoWindow(title: 'Destination'),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-              ),
-            };
-
             _polylines = {
               Polyline(
                 polylineId: const PolylineId('route'),
@@ -620,6 +785,7 @@ class _MapPageState extends State<MapPage> {
             };
           });
 
+          _updateMapMarkers();
           _fitMapToRoute(from, to);
           print('Map updated successfully');
         } else {
@@ -733,21 +899,6 @@ class _MapPageState extends State<MapPage> {
         _currentSaferRoute = null;
       }
 
-      _markers = {
-        Marker(
-          markerId: const MarkerId('from'),
-          position: _currentFromLocation!,
-          infoWindow: const InfoWindow(title: 'Start'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        ),
-        Marker(
-          markerId: const MarkerId('to'),
-          position: _currentToLocation!,
-          infoWindow: const InfoWindow(title: 'Destination'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        ),
-      };
-
       _polylines = {
         Polyline(
           polylineId: const PolylineId('saved_route'),
@@ -758,6 +909,7 @@ class _MapPageState extends State<MapPage> {
       };
     });
 
+    _updateMapMarkers();
     _fitMapToRoute(_currentFromLocation!, _currentToLocation!);
     Navigator.of(context).pop(); // Close the saved routes dialog
 
@@ -919,6 +1071,30 @@ class _MapPageState extends State<MapPage> {
         _currentPolyline != null;
   }
 
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: Constants.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -939,6 +1115,54 @@ class _MapPageState extends State<MapPage> {
                   controller: _toController,
                   labelText: "To",
                   prefixIcon: Icons.location_on,
+                ),
+                const SizedBox(height: AppConstants.spacingS),
+
+                // Add crime reports toggle
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning,
+                      color: _showCrimeReports ? Constants.error : Constants.greyDark,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Show Crime Reports',
+                      style: TextStyle(
+                        color: _showCrimeReports ? Constants.textPrimary : Constants.greyDark,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Spacer(),
+                    Switch(
+                      value: _showCrimeReports,
+                      onChanged: (value) {
+                        setState(() {
+                          _showCrimeReports = value;
+                          _updateMapMarkers();
+                        });
+                      },
+                      activeColor: Constants.error,
+                    ),
+                    const SizedBox(width: 8),
+                    if (_isLoadingCrimeReports)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      IconButton(
+                        onPressed: _loadCrimeReports,
+                        icon: Icon(
+                          Icons.refresh,
+                          color: Constants.primary,
+                          size: 20,
+                        ),
+                        tooltip: 'Refresh crime data',
+                      ),
+                  ],
                 ),
                 const SizedBox(height: AppConstants.spacingS),
 
@@ -1055,6 +1279,26 @@ class _MapPageState extends State<MapPage> {
                     ),
                   ],
                 ),
+
+                // Crime reports legend
+                if (_showCrimeReports && _crimeReports.isNotEmpty) ...[
+                  const SizedBox(height: AppConstants.spacingS),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Constants.surface,
+                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildLegendItem('High', Colors.red),
+                        _buildLegendItem('Medium', Colors.orange),
+                        _buildLegendItem('Low', Colors.yellow),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1072,13 +1316,6 @@ class _MapPageState extends State<MapPage> {
               polylines: _polylines,
               myLocationEnabled: true,
               myLocationButtonEnabled: true,
-              style: '''[
-                      {
-                        "featureType": "all",
-                        "elementType": "geometry.fill",
-                        "stylers": [{"color": "#1a1a1a"}]
-                      }
-                    ]''',
             )
                 : const Center(child: CircularProgressIndicator()),
           ),
@@ -1087,4 +1324,3 @@ class _MapPageState extends State<MapPage> {
     );
   }
 }
-
