@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+
 import '../constants.dart';
-import '../services/crime_report/crime_report_service.dart';
 import '../models/crime_report_model.dart';
+import '../services/crime_report/crime_report_service.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({Key? key}) : super(key: key);
@@ -11,56 +13,67 @@ class ReportPage extends StatefulWidget {
   State<ReportPage> createState() => _ReportPageState();
 }
 
-class _ReportPageState extends State<ReportPage> with SingleTickerProviderStateMixin {
-  List<CrimeReport> _reports = [];
-  bool _isLoadingReports = false;
-  String? _filterSeverity;
-  String? _filterStatus;
-  Set<Marker> _markers = {};
+class _ReportPageState extends State<ReportPage> {
   GoogleMapController? _mapController;
+  LatLng? _currentLocation;
+  Set<Marker> _markers = {};
 
-  late TabController _tabController;
+  List<CrimeReport> _crimeReports = [];
+  bool _isLoadingReports = false;
+  bool _showCrimeReports = true;
+  String? _selectedSeverity;
 
-  // Tinurik, Tanauan City, Batangas coordinates
-  static const CameraPosition _defaultLocation = CameraPosition(
-    target: LatLng(14.0865, 121.1497), // Tinurik, Tanauan City, Batangas
-    zoom: 15,
-  );
-
-  // Boundaries for Tinurik, Tanauan City, Batangas (approximate)
-  static final LatLngBounds _tinurikBounds = LatLngBounds(
-    southwest: LatLng(14.0800, 121.1400), // Southwest boundary
-    northeast: LatLng(14.0930, 121.1594), // Northeast boundary
-  );
+  final List<String> _severityOptions = ['All', 'High', 'Medium', 'Low'];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _loadReports();
+    _getCurrentLocation();
+    _loadCrimeReports();
   }
 
-  Future<void> _loadReports() async {
+  Future<void> _getCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        Position position = await Geolocator.getCurrentPosition();
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+      }
+    } catch (e) {
+      print('Error getting location: $e');
+    }
+  }
+
+  Future<void> _loadCrimeReports() async {
     setState(() {
       _isLoadingReports = true;
     });
 
     try {
       final result = await CrimeReportService.getReports();
-      if (result['success']) {
+      if (result['success'] == true) {
         setState(() {
-          _reports = result['reports'];
-          _createMapMarkers();
+          _crimeReports = result['reports'] ?? [];
+          _updateMapMarkers();
         });
       } else {
+        print('Failed to load crime reports: ${result['error']}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['error'] ?? 'Failed to load reports'),
+            content: Text('Failed to load reports: ${result['error']}'),
             backgroundColor: Constants.error,
           ),
         );
       }
     } catch (e) {
+      print('Error loading crime reports: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading reports: $e'),
@@ -74,413 +87,174 @@ class _ReportPageState extends State<ReportPage> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _refreshReports() async {
-    await _loadReports();
+  void _updateMapMarkers() {
+    Set<Marker> newMarkers = {};
 
-    // Show success message after refresh
-    if (mounted && !_isLoadingReports) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Reports refreshed'),
-          backgroundColor: Constants.success,
-          duration: Duration(seconds: 1),
-        ),
-      );
-    }
-  }
+    // Filter reports based on selected severity and visibility toggle
+    if (_showCrimeReports) {
+      List<CrimeReport> filteredReports = _crimeReports;
+      if (_selectedSeverity != null && _selectedSeverity != 'All') {
+        filteredReports = _crimeReports
+            .where((report) => report.severity.toLowerCase() == _selectedSeverity!.toLowerCase())
+            .toList();
+      }
 
-  void _createMapMarkers() {
-    _markers.clear();
-
-    for (int i = 0; i < _reports.length; i++) {
-      final report = _reports[i];
-
-      // Only add markers for reports within Tinurik bounds
-      if (_isWithinTinurikBounds(report.latitude, report.longitude)) {
-        Color markerColor;
-        switch (report.severity.toLowerCase()) {
-          case 'critical':
-            markerColor = Constants.error;
-            break;
-          case 'high':
-            markerColor = Constants.warning;
-            break;
-          case 'medium':
-            markerColor = Constants.info;
-            break;
-          default:
-            markerColor = Constants.success;
-        }
-
-        _markers.add(
+      // Add crime report markers
+      for (final crime in filteredReports) {
+        newMarkers.add(
           Marker(
-            markerId: MarkerId('report_$i'),
-            position: LatLng(report.latitude, report.longitude),
+            markerId: MarkerId('crime_${crime.id}'),
+            position: LatLng(crime.latitude, crime.longitude),
+            icon: _getCrimeMarkerIcon(crime.severity),
             infoWindow: InfoWindow(
-              title: report.title,
-              snippet: '${report.severity} - ${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
+              title: crime.title,
+              snippet: '${crime.severity.toUpperCase()} severity\n${_formatDate(crime.incidentDate)}',
             ),
-            onTap: () => _showReportDetails(report),
+            onTap: () => _showCrimeDetails(crime),
           ),
         );
       }
     }
+
+    setState(() {
+      _markers = newMarkers;
+    });
   }
 
-  bool _isWithinTinurikBounds(double lat, double lng) {
-    return lat >= _tinurikBounds.southwest.latitude &&
-           lat <= _tinurikBounds.northeast.latitude &&
-           lng >= _tinurikBounds.southwest.longitude &&
-           lng <= _tinurikBounds.northeast.longitude;
+  BitmapDescriptor _getCrimeMarkerIcon(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'high':
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+      case 'medium':
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+      case 'low':
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+      default:
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
+    }
   }
 
-  void _showReportDetails(CrimeReport report) {
+  void _showCrimeDetails(CrimeReport crime) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Constants.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppConstants.radiusM),
+        ),
         title: Text(
-          report.title,
-          style: TextStyle(color: Constants.textPrimary),
+          crime.title,
+          style: TextStyle(
+            color: Constants.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Description: ${report.description ?? "No description provided"}', // Handle null description
-              style: TextStyle(color: Constants.textSecondary),
+            _buildDetailRow(
+              'Severity',
+              crime.severity.toUpperCase(),
+              _getSeverityColor(crime.severity),
             ),
-            SizedBox(height: AppConstants.spacingS),
-            Text(
-              'Severity: ${report.severity}',
-              style: TextStyle(color: Constants.textSecondary),
+            const SizedBox(height: AppConstants.spacingS),
+            if (crime.description != null && crime.description!.isNotEmpty) ...[
+              _buildDetailRow('Description', crime.description!, Constants.textSecondary),
+              const SizedBox(height: AppConstants.spacingS),
+            ],
+            if (crime.address != null && crime.address!.isNotEmpty) ...[
+              _buildDetailRow('Address', crime.address!, Constants.textSecondary),
+              const SizedBox(height: AppConstants.spacingS),
+            ],
+            _buildDetailRow(
+              'Date',
+              _formatDate(crime.incidentDate),
+              Constants.textSecondary,
             ),
-            SizedBox(height: AppConstants.spacingS),
-            Text(
-              'Date: ${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
-              style: TextStyle(color: Constants.textSecondary),
+            const SizedBox(height: AppConstants.spacingS),
+            _buildDetailRow(
+              'Location',
+              '${crime.latitude.toStringAsFixed(4)}, ${crime.longitude.toStringAsFixed(4)}',
+              Constants.textSecondary,
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close', style: TextStyle(color: Constants.primary)),
+            child: Text(
+              'Close',
+              style: TextStyle(color: Constants.primary),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, Color valueColor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: TextStyle(
+              color: Constants.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: valueColor,
+              fontWeight: label == 'Severity' ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
-      case 'critical':
+      case 'high':
         return Constants.error;
-      case 'high':
+      case 'medium':
         return Constants.warning;
-      case 'medium':
-        return Constants.info;
-      default:
+      case 'low':
         return Constants.success;
-    }
-  }
-
-  Widget _buildReportItem(CrimeReport report) {
-    Color severityColor = _getSeverityColor(report.severity);
-    IconData severityIcon;
-
-    switch (report.severity.toLowerCase()) {
-      case 'critical':
-        severityIcon = Icons.crisis_alert;
-        break;
-      case 'high':
-        severityIcon = Icons.warning;
-        break;
-      case 'medium':
-        severityIcon = Icons.info;
-        break;
       default:
-        severityIcon = Icons.info_outline;
+        return Constants.textSecondary;
     }
-
-    return Card(
-      color: Constants.surface,
-      margin: EdgeInsets.only(bottom: AppConstants.spacingM),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppConstants.radiusM),
-      ),
-      child: InkWell(
-        onTap: () => _showReportDetails(report),
-        borderRadius: BorderRadius.circular(AppConstants.radiusM),
-        child: Padding(
-          padding: EdgeInsets.all(AppConstants.spacingM),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(severityIcon, color: severityColor, size: 20),
-                  SizedBox(width: AppConstants.spacingS),
-                  Expanded(
-                    child: Text(
-                      report.title,
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppConstants.spacingS,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: severityColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
-                    ),
-                    child: Text(
-                      report.severity.toUpperCase(),
-                      style: TextStyle(
-                        color: severityColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: AppConstants.spacingS),
-              Text(
-                report.description ?? "No description provided", // Handle null description
-                style: TextStyle(
-                  color: Constants.textSecondary,
-                  fontSize: 14,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              SizedBox(height: AppConstants.spacingS),
-              Row(
-                children: [
-                  Icon(Icons.location_on, color: Constants.textSecondary, size: 16),
-                  SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      report.address ?? "Location: ${report.latitude.toStringAsFixed(4)}, ${report.longitude.toStringAsFixed(4)}",
-                      style: TextStyle(
-                        color: Constants.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${report.incidentDate.day}/${report.incidentDate.month}/${report.incidentDate.year}',
-                    style: TextStyle(
-                      color: Constants.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Constants.background,
-      child: Column(
-        children: [
-          Container(
-            color: Constants.surface,
-            padding: EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: Constants.primary,
-              unselectedLabelColor: Constants.textSecondary,
-              indicatorColor: Constants.primary,
-              tabs: [
-                Tab(
-                  icon: Icon(Icons.map),
-                  text: 'Map View',
-                ),
-                Tab(
-                  icon: Icon(Icons.list),
-                  text: 'List View',
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildMapView(),
-                _buildListView(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
-  Widget _buildMapView() {
-    return RefreshIndicator(
-      onRefresh: _refreshReports,
-      color: Constants.primary,
-      backgroundColor: Constants.surface,
-      strokeWidth: 3,
-      child: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: _defaultLocation,
-            markers: _markers,
-            onMapCreated: (GoogleMapController controller) {
-              _mapController = controller;
-            },
-            cameraTargetBounds: CameraTargetBounds(_tinurikBounds),
-            minMaxZoomPreference: MinMaxZoomPreference(13.0, 18.0),
-          ),
-          Positioned(
-            top: AppConstants.spacingM,
-            left: AppConstants.spacingM,
-            right: AppConstants.spacingM,
-            child: Container(
-              padding: EdgeInsets.all(AppConstants.spacingM),
-              decoration: BoxDecoration(
-                color: Constants.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                boxShadow: [
-                  BoxShadow(
-                    color: Constants.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.location_on, color: Constants.primary),
-                  SizedBox(width: AppConstants.spacingS),
-                  Expanded(
-                    child: Text(
-                      'Tinurik, Tanauan City, Batangas - ${_reports.length} reports',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_isLoadingReports)
-            Container(
-              color: Constants.black.withOpacity(0.3),
-              child: Center(
-                child: CircularProgressIndicator(color: Constants.primary),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildListView() {
-    return Column(
+  Widget _buildLegendItem(String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: EdgeInsets.all(AppConstants.spacingM),
-          child: Row(
-            children: [
-              Icon(Icons.report, color: Constants.primary),
-              SizedBox(width: AppConstants.spacingS),
-              Text(
-                'Crime Reports',
-                style: TextStyle(
-                  color: Constants.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Spacer(),
-              Text(
-                '${_reports.length} item${_reports.length != 1 ? 's' : ''}',
-                style: TextStyle(
-                  color: Constants.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
-            ],
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
           ),
         ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _refreshReports,
-            color: Constants.primary,
-            backgroundColor: Constants.surface,
-            strokeWidth: 3,
-            child: _isLoadingReports
-                ? ListView(
-                    physics: AlwaysScrollableScrollPhysics(),
-                    children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                      Center(
-                        child: Column(
-                          children: [
-                            CircularProgressIndicator(color: Constants.primary),
-                            SizedBox(height: AppConstants.spacingM),
-                            Text(
-                              'Loading reports...',
-                              style: TextStyle(color: Constants.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                : _reports.isEmpty
-                    ? ListView(
-                        physics: AlwaysScrollableScrollPhysics(),
-                        children: [
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                          Center(
-                            child: Column(
-                              children: [
-                                Icon(Icons.inbox, size: 64, color: Constants.textSecondary),
-                                SizedBox(height: AppConstants.spacingM),
-                                Text(
-                                  'No reports found',
-                                  style: TextStyle(color: Constants.textSecondary),
-                                ),
-                                SizedBox(height: AppConstants.spacingS),
-                                Text(
-                                  'Pull down to refresh',
-                                  style: TextStyle(
-                                    color: Constants.textHint,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.builder(
-                        physics: AlwaysScrollableScrollPhysics(),
-                        padding: EdgeInsets.all(AppConstants.spacingM),
-                        itemCount: _reports.length,
-                        itemBuilder: (context, index) => _buildReportItem(_reports[index]),
-                      ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: Constants.textSecondary,
+            fontSize: 12,
           ),
         ),
       ],
@@ -488,8 +262,176 @@ class _ReportPageState extends State<ReportPage> with SingleTickerProviderStateM
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Constants.background,
+      body: Column(
+        children: [
+          // Controls panel
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            child: Column(
+              children: [
+                // Header with report count and refresh
+                Row(
+                  children: [
+                    Icon(
+                      Icons.report_problem,
+                      color: Constants.error,
+                      size: 24,
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Text(
+                      'Crime Reports (${_crimeReports.length})',
+                      style: TextStyle(
+                        color: Constants.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Toggle switch for showing/hiding crime reports
+                    Switch(
+                      value: _showCrimeReports,
+                      onChanged: (value) {
+                        setState(() {
+                          _showCrimeReports = value;
+                          _updateMapMarkers();
+                        });
+                      },
+                      activeColor: Constants.primary,
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    if (_isLoadingReports)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      IconButton(
+                        onPressed: _loadCrimeReports,
+                        icon: Icon(
+                          Icons.refresh,
+                          color: Constants.primary,
+                        ),
+                        tooltip: 'Refresh reports',
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingS),
+
+                // Severity filter dropdown
+                Row(
+                  children: [
+                    Text(
+                      'Filter by severity:',
+                      style: TextStyle(
+                        color: Constants.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedSeverity,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Constants.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                            borderSide: BorderSide(color: Constants.greyDark),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                            borderSide: BorderSide(color: Constants.greyDark),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        dropdownColor: Constants.surface,
+                        style: TextStyle(color: Constants.textPrimary),
+                        items: _severityOptions.map((severity) {
+                          return DropdownMenuItem<String>(
+                            value: severity,
+                            child: Text(
+                              severity,
+                              style: TextStyle(
+                                color: severity == 'All'
+                                    ? Constants.textPrimary
+                                    : _getSeverityColor(severity),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSeverity = value;
+                            _updateMapMarkers();
+                          });
+                        },
+                        hint: Text(
+                          'All severities',
+                          style: TextStyle(color: Constants.textSecondary),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingS),
+
+                // Legend
+                if (_crimeReports.isNotEmpty && _showCrimeReports) ...[
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Constants.surface,
+                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildLegendItem('High', Colors.red),
+                        _buildLegendItem('Medium', Colors.orange),
+                        _buildLegendItem('Low', Colors.yellow),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Map
+          Expanded(
+            child: _currentLocation != null
+                ? GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _currentLocation!,
+                      zoom: 12.0,
+                    ),
+                    onMapCreated: (GoogleMapController controller) {
+                      _mapController = controller;
+                    },
+                    markers: _markers,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                  )
+                : const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Loading map...'),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 }
