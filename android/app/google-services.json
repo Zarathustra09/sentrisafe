@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "170016305965",
+    "project_id": "sentrisafe-7b671",
+    "storage_bucket": "sentrisafe-7b671.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:170016305965:android:2c903a0cce4b4daf8159a4",
+        "android_client_info": {
+          "package_name": "com.sentrisafe.net"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEQUQ_-r2CrIawGw9p6aaXcns9-FbhSPY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

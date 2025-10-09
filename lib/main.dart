@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'services/shared_preferences.dart';
 import 'services/auth/auth_service.dart';
 import 'route/router.dart';
@@ -7,8 +8,9 @@ import 'pages/onboarding/onboarding_page.dart';
 import 'pages/auth/login_page.dart';
 import 'entry_point.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 
