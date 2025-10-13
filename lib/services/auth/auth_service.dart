@@ -10,6 +10,12 @@ import 'package:sentrisafe/constants.dart';
 class AuthService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
+  // Keys for local storage
+  static const String _fcmTokenKey = 'fcm_token';
+  static const String _tokenTimestampKey = 'fcm_token_timestamp';
+  static const String _authTokenKey = 'auth_token';
+  static const String _userIdKey = 'user_id';
+
   // Helper method for consistent logging
   static void _log(String message) {
     print('[AuthService] $message');
@@ -19,12 +25,13 @@ class AuthService {
     print('[AuthService ERROR] $operation: $error');
   }
 
+  // Auth data management
   static Future<void> _saveAuthData(String token, int userId) async {
     try {
       _log('Saving auth data - UserId: $userId');
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('auth_token', token);
-      await prefs.setInt('user_id', userId);
+      await prefs.setString(_authTokenKey, token);
+      await prefs.setInt(_userIdKey, userId);
       _log('Auth data saved successfully');
     } catch (e) {
       _logError('_saveAuthData', e);
@@ -36,8 +43,10 @@ class AuthService {
     try {
       _log('Clearing auth data');
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-      await prefs.remove('user_id');
+      await prefs.remove(_authTokenKey);
+      await prefs.remove(_userIdKey);
+      await prefs.remove(_fcmTokenKey);
+      await prefs.remove(_tokenTimestampKey);
       _log('Auth data cleared successfully');
     } catch (e) {
       _logError('_clearAuthData', e);
@@ -48,7 +57,7 @@ class AuthService {
   static Future<String?> getAuthToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
+      final token = prefs.getString(_authTokenKey);
       _log('Retrieved auth token: ${token != null ? 'Found' : 'Not found'}');
       return token;
     } catch (e) {
@@ -60,7 +69,7 @@ class AuthService {
   static Future<int?> getUserId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('user_id');
+      final userId = prefs.getInt(_userIdKey);
       _log('Retrieved user ID: ${userId ?? 'Not found'}');
       return userId;
     } catch (e) {
@@ -81,16 +90,61 @@ class AuthService {
     }
   }
 
+  // FCM Token management with best practices
+  static Future<void> _saveFCMToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_fcmTokenKey, token);
+      await prefs.setString(_tokenTimestampKey, DateTime.now().toIso8601String());
+      _log('FCM token saved locally with timestamp');
+    } catch (e) {
+      _logError('_saveFCMToken', e);
+    }
+  }
+
+  static Future<String?> _getStoredFCMToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_fcmTokenKey);
+    } catch (e) {
+      _logError('_getStoredFCMToken', e);
+      return null;
+    }
+  }
+
+  static Future<bool> _isTokenStale() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestampString = prefs.getString(_tokenTimestampKey);
+
+      if (timestampString == null) {
+        _log('No token timestamp found, considering token stale');
+        return true;
+      }
+
+      final timestamp = DateTime.parse(timestampString);
+      final now = DateTime.now();
+      final daysDifference = now.difference(timestamp).inDays;
+
+      _log('Token age: $daysDifference days');
+
+      // Consider token stale if older than 30 days
+      return daysDifference > 30;
+    } catch (e) {
+      _logError('_isTokenStale', e);
+      return true; // Consider stale on error
+    }
+  }
+
   static Future<String> _getDeviceType() async {
     try {
-      final deviceInfo = DeviceInfoPlugin();
       String deviceType;
       if (Platform.isAndroid) {
         deviceType = 'android';
       } else if (Platform.isIOS) {
         deviceType = 'ios';
       } else {
-        deviceType = 'unknown';
+        deviceType = 'web';
       }
       _log('Device type detected: $deviceType');
       return deviceType;
@@ -99,43 +153,175 @@ class AuthService {
       return 'unknown';
     }
   }
-
-  static Future<void> _registerFCMToken() async {
+// Update the initializeFCM method
+  static Future<void> initializeFCM() async {
     try {
-      _log('Starting FCM token registration');
+      _log('Initializing FCM');
 
       // Request permission for notifications
       NotificationSettings settings = await _messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
+        provisional: false,
       );
 
       _log('FCM permission status: ${settings.authorizationStatus}');
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        _log('FCM permission granted, getting token');
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
 
-        // Get FCM token
-        String? fcmToken = await _messaging.getToken();
-        _log('FCM token retrieved: ${fcmToken != null ? 'Success' : 'Failed'}');
-
-        if (fcmToken != null) {
-          _log('Registering FCM token with server: ${fcmToken.substring(0, 20)}...');
-          final result = await registerDeviceToken(fcmToken);
-          _log('FCM token registration result: $result');
-        }
+        await _handleTokenRefresh();
 
         // Listen for token refresh
-        _messaging.onTokenRefresh.listen((newToken) {
-          _log('FCM token refreshed, registering new token: ${newToken.substring(0, 20)}...');
-          registerDeviceToken(newToken);
-        });
+        _messaging.onTokenRefresh.listen(_handleTokenRefresh);
+
+        // Set up message handling
+        await setupForegroundMessageHandling();
+        await setupMessageInteractionHandling();
+
       } else {
         _log('FCM permission denied');
       }
     } catch (e) {
+      _logError('initializeFCM', e);
+    }
+  }
+
+
+  static Future<void> _handleTokenRefresh([String? newToken]) async {
+    try {
+      _log('Handling FCM token refresh');
+
+      String? currentToken = newToken ?? await _messaging.getToken();
+
+      if (currentToken == null) {
+        _log('No FCM token available');
+        return;
+      }
+
+      String? storedToken = await _getStoredFCMToken();
+      bool isTokenStale = await _isTokenStale();
+
+      // Update token if it's new, different, or stale
+      if (storedToken != currentToken || isTokenStale) {
+        _log('Token needs update - New: ${storedToken != currentToken}, Stale: $isTokenStale');
+        await _saveFCMToken(currentToken);
+
+        // Only register with server if user is logged in
+        if (await isLoggedIn()) {
+          await _updateTokenOnServer(currentToken);
+        }
+      } else {
+        _log('Token is current and fresh');
+      }
+    } catch (e) {
+      _logError('_handleTokenRefresh', e);
+    }
+  }
+
+  static Future<void> _registerFCMToken() async {
+    try {
+      _log('Starting FCM token registration process');
+
+      if (!await isLoggedIn()) {
+        _log('User not logged in, skipping FCM registration');
+        return;
+      }
+
+      String? fcmToken = await _messaging.getToken();
+
+      if (fcmToken != null) {
+        await _saveFCMToken(fcmToken);
+        await _updateTokenOnServer(fcmToken);
+      } else {
+        _log('No FCM token available for registration');
+      }
+    } catch (e) {
       _logError('_registerFCMToken', e);
+    }
+  }
+
+  static Future<void> _updateTokenOnServer(String token) async {
+    try {
+      _log('Updating token on server: ${token.substring(0, 20)}...');
+
+      final authToken = await getAuthToken();
+      if (authToken == null) {
+        _log('No auth token found, cannot update FCM token on server');
+        return;
+      }
+
+      final deviceType = await _getDeviceType();
+      final timestamp = DateTime.now().toIso8601String();
+
+      final requestBody = {
+        'token': token,
+        'device_type': deviceType,
+        'timestamp': timestamp,
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/device-token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      _log('Server token update - Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        _log('Token updated on server successfully');
+      } else {
+        _logError('Server token update failed', response.body);
+      }
+    } catch (e) {
+      _logError('_updateTokenOnServer', e);
+    }
+  }
+
+  // Refresh stale tokens - call periodically or on app resume
+  static Future<void> refreshTokenIfNeeded() async {
+    try {
+      _log('Checking if token refresh is needed');
+
+      if (!await isLoggedIn()) {
+        _log('User not logged in, skipping token refresh');
+        return;
+      }
+
+      bool isStale = await _isTokenStale();
+
+      if (isStale) {
+        _log('Token is stale, refreshing');
+        await _handleTokenRefresh();
+
+        // Also refresh stale tokens on server
+        final authToken = await getAuthToken();
+        if (authToken != null) {
+          try {
+            final response = await http.post(
+              Uri.parse('$baseUrl/device-token/refresh'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer $authToken',
+              },
+            );
+
+            _log('Server token refresh - Status: ${response.statusCode}');
+          } catch (e) {
+            _logError('Server token refresh', e);
+          }
+        }
+      } else {
+        _log('Token is fresh, no refresh needed');
+      }
+    } catch (e) {
+      _logError('refreshTokenIfNeeded', e);
     }
   }
 
@@ -150,11 +336,12 @@ class AuthService {
       }
 
       final deviceType = await _getDeviceType();
-      _log('Registering device token with type: $deviceType');
+      final timestamp = DateTime.now().toIso8601String();
 
       final requestBody = {
         'token': token,
         'device_type': deviceType,
+        'timestamp': timestamp,
       };
       _log('Request body: $requestBody');
 
@@ -175,6 +362,7 @@ class AuthService {
 
       if (response.statusCode == 200) {
         _log('Device token registered successfully');
+        await _saveFCMToken(token);
         return {'success': true, 'message': data['message']};
       } else {
         _logError('Device token registration failed', 'Status: ${response.statusCode}, Response: ${response.body}');
@@ -202,7 +390,7 @@ class AuthService {
         return {'success': false, 'error': 'No auth token found'};
       }
 
-      String? fcmToken = await _messaging.getToken();
+      String? fcmToken = await _getStoredFCMToken() ?? await _messaging.getToken();
       if (fcmToken == null) {
         _log('No FCM token found for removal');
         return {'success': false, 'error': 'No FCM token found'};
@@ -227,6 +415,11 @@ class AuthService {
 
       if (response.statusCode == 200) {
         _log('Device token removed successfully');
+        // Clear local token storage
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_fcmTokenKey);
+        await prefs.remove(_tokenTimestampKey);
+
         return {'success': true, 'message': data['message']};
       } else {
         _logError('Device token removal failed', 'Status: ${response.statusCode}, Response: ${response.body}');
@@ -256,6 +449,11 @@ class AuthService {
       _log('Registration data - Name: $name, Email: $email');
       _log('ID Image path: ${idImage.path}');
 
+      // Get FCM token before registration
+      String? fcmToken = await _messaging.getToken();
+      String deviceType = await _getDeviceType();
+      String timestamp = DateTime.now().toIso8601String();
+
       var uri = Uri.parse('$baseUrl/register');
       _log('Registration URL: $uri');
 
@@ -265,6 +463,12 @@ class AuthService {
       request.fields['email'] = email;
       request.fields['password'] = password;
       request.fields['password_confirmation'] = passwordConfirmation;
+
+      if (fcmToken != null) {
+        request.fields['fcm_token'] = fcmToken;
+        request.fields['device_type'] = deviceType;
+        request.fields['timestamp'] = timestamp;
+      }
 
       String fileExtension = idImage.path.split('.').last.toLowerCase();
       String mimeType = fileExtension == 'png' ? 'png' : 'jpeg';
@@ -292,9 +496,13 @@ class AuthService {
         int userId = int.parse(data['user']['id'].toString());
         await _saveAuthData(data['token'], userId);
 
-        // Register FCM token after successful registration
-        _log('Starting FCM token registration after registration');
-        await _registerFCMToken();
+        // Save FCM token locally if available
+        if (fcmToken != null) {
+          await _saveFCMToken(fcmToken);
+        }
+
+        // Initialize FCM after successful registration
+        await initializeFCM();
 
         return {'success': true, 'token': data['token'], 'user': data['user']};
       } else {
@@ -321,7 +529,22 @@ class AuthService {
       _log('Starting login process');
       _log('Login attempt for email: $email');
 
-      final loginData = {'email': email, 'password': password};
+      // Get FCM token before login
+      String? fcmToken = await _messaging.getToken();
+      String deviceType = await _getDeviceType();
+      String timestamp = DateTime.now().toIso8601String();
+
+      final loginData = {
+        'email': email,
+        'password': password,
+      };
+
+      if (fcmToken != null) {
+        loginData['fcm_token'] = fcmToken;
+        loginData['device_type'] = deviceType;
+        loginData['timestamp'] = timestamp;
+      }
+
       _log('Login request data: $loginData');
 
       final response = await http.post(
@@ -343,9 +566,13 @@ class AuthService {
         int userId = int.parse(data['user_id'].toString());
         await _saveAuthData(data['token'], userId);
 
-        // Register FCM token after successful login
-        _log('Starting FCM token registration after login');
-        await _registerFCMToken();
+        // Save FCM token locally if available
+        if (fcmToken != null) {
+          await _saveFCMToken(fcmToken);
+        }
+
+        // Initialize FCM after successful login
+        await initializeFCM();
 
         return {
           'success': true,
@@ -369,13 +596,12 @@ class AuthService {
       final token = await getAuthToken();
       if (token == null) {
         _log('No token found for logout');
-        return {'success': false, 'error': 'No token found'};
+        await _clearAuthData();
+        return {'success': true, 'message': 'Already logged out'};
       }
 
-      // Remove FCM token before logout
-      _log('Removing FCM token before logout');
-      final tokenRemovalResult = await removeDeviceToken();
-      _log('FCM token removal result: $tokenRemovalResult');
+      // Get FCM token for removal
+      String? fcmToken = await _getStoredFCMToken() ?? await _messaging.getToken();
 
       _log('Sending logout request to server');
       final response = await http.post(
@@ -383,12 +609,17 @@ class AuthService {
         headers: {
           'Authorization': 'Bearer $token',
           'Accept': 'application/json',
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({
+          if (fcmToken != null) 'fcm_token': fcmToken,
+        }),
       );
 
       _log('Logout - Status: ${response.statusCode}');
       _log('Logout - Response: ${response.body}');
 
+      // Always clear local data regardless of server response
       await _clearAuthData();
 
       if (response.statusCode == 200) {
@@ -404,4 +635,69 @@ class AuthService {
       return {'success': true, 'message': 'Logged out locally'};
     }
   }
+
+
+// Add these methods to your AuthService class
+
+  static Future<void> setupForegroundMessageHandling() async {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      _log('Got a message whilst in the foreground!');
+      _log('Message data: ${message.data}');
+
+      if (message.notification != null) {
+        _log('Message also contained a notification: ${message.notification}');
+
+        // Handle the notification based on type
+        _handleNotificationReceived(message);
+      }
+    });
+  }
+
+  static Future<void> setupMessageInteractionHandling() async {
+    // Handle notification tap when app is terminated
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        _log('App opened from terminated state via notification');
+        _handleNotificationTap(message);
+      }
+    });
+
+    // Handle notification tap when app is in background
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _log('App opened from background via notification');
+      _handleNotificationTap(message);
+    });
+  }
+
+  static void _handleNotificationReceived(RemoteMessage message) {
+    // Handle different notification types
+    final notificationType = message.data['type'];
+
+    switch (notificationType) {
+      case 'announcement':
+        _log('Received announcement notification: ${message.data['title']}');
+        // You can show a local notification or update UI here
+        break;
+      default:
+        _log('Received unknown notification type: $notificationType');
+    }
+  }
+
+  static void _handleNotificationTap(RemoteMessage message) {
+    final notificationType = message.data['type'];
+
+    switch (notificationType) {
+      case 'announcement':
+        _log('User tapped announcement notification');
+        // Navigate to announcement details
+        // You'll need to implement navigation logic here
+        break;
+      default:
+        _log('User tapped unknown notification type: $notificationType');
+    }
+  }
+
+
+
+
 }
