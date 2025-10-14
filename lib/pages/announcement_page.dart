@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sentrisafe/models/announcement_model.dart';
 import 'package:sentrisafe/services/announcement/announcement_service.dart';
+import 'package:sentrisafe/widgets/comments_section.dart';
 import '../constants.dart';
 
 class AnnouncementPage extends StatefulWidget {
@@ -19,6 +20,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   int lastPage = 1;
   bool isLoadingMore = false;
   final ScrollController _scrollController = ScrollController();
+
+  // For showing announcement details with comments
+  bool _showAnnouncementDetail = false;
+  Announcement? _selectedAnnouncement;
 
   @override
   void initState() {
@@ -70,7 +75,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       isLoadingMore = true;
     });
 
-    final result = await AnnouncementService.getAnnouncements(page: currentPage + 1);
+    final result =
+        await AnnouncementService.getAnnouncements(page: currentPage + 1);
 
     if (mounted) {
       setState(() {
@@ -108,6 +114,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Similar pattern to home_page.dart
+    if (_showAnnouncementDetail && _selectedAnnouncement != null) {
+      return _buildAnnouncementDetail();
+    }
+
     return RefreshIndicator(
       onRefresh: _refreshAnnouncements,
       color: Constants.primary,
@@ -326,7 +337,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           child: ListView.builder(
             controller: _scrollController,
             physics: AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
+            padding:
+                const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
             itemCount: announcements.length + (isLoadingMore ? 1 : 0),
             itemBuilder: (context, index) {
               if (index == announcements.length) {
@@ -352,154 +364,203 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   Widget _buildAnnouncementCard(Announcement announcement) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppConstants.spacingM),
-      decoration: BoxDecoration(
-        color: Constants.surface,
-        borderRadius: BorderRadius.circular(AppConstants.radiusM),
-        boxShadow: [
-          BoxShadow(
-            color: Constants.black.withOpacity(0.1),
-            blurRadius: AppConstants.elevationM,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with user info and date
-          Padding(
-            padding: const EdgeInsets.all(AppConstants.spacingM),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Constants.primary,
-                  radius: 20,
-                  child: Text(
-                    announcement.user?.name.substring(0, 1).toUpperCase() ?? 'A',
-                    style: const TextStyle(
-                      color: Constants.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppConstants.spacingS),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        announcement.user?.name ?? 'Administrator',
-                        style: const TextStyle(
-                          color: Constants.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        _formatDate(announcement.createdAt),
-                        style: const TextStyle(
-                          color: Constants.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (announcement.isActive)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppConstants.spacingS,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Constants.success,
-                      borderRadius: BorderRadius.circular(AppConstants.radiusS),
-                    ),
-                    child: const Text(
-                      'Active',
-                      style: TextStyle(
+    return GestureDetector(
+      onTap: () {
+        // Show detail view inline (like home page pattern)
+        setState(() {
+          _showAnnouncementDetail = true;
+          _selectedAnnouncement = announcement;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppConstants.spacingM),
+        decoration: BoxDecoration(
+          color: Constants.surface,
+          borderRadius: BorderRadius.circular(AppConstants.radiusM),
+          boxShadow: [
+            BoxShadow(
+              color: Constants.black.withOpacity(0.1),
+              blurRadius: AppConstants.elevationM,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with user info and date
+            Padding(
+              padding: const EdgeInsets.all(AppConstants.spacingM),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Constants.primary,
+                    radius: 20,
+                    child: Text(
+                      announcement.user?.name.substring(0, 1).toUpperCase() ??
+                          'A',
+                      style: const TextStyle(
                         color: Constants.white,
-                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-
-          // Title
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
-            child: Text(
-              announcement.title,
-              style: const TextStyle(
-                color: Constants.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: AppConstants.spacingS),
-
-          // Description
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
-            child: Text(
-              announcement.description,
-              style: const TextStyle(
-                color: Constants.textSecondary,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-          ),
-
-          // Images if available
-          if (announcement.images.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.all(AppConstants.spacingM),
-              height: 200,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: announcement.images.length,
-                itemBuilder: (context, index) {
-                  return Container(
-                    margin: EdgeInsets.only(
-                      right: index < announcement.images.length - 1
-                        ? AppConstants.spacingS : 0,
+                  const SizedBox(width: AppConstants.spacingS),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          announcement.user?.name ?? 'Administrator',
+                          style: const TextStyle(
+                            color: Constants.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          _formatDate(announcement.createdAt),
+                          style: const TextStyle(
+                            color: Constants.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
-                    width: 300,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                      child: Image.network(
-                        announcement.images[index].fullUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Constants.greyDark,
-                            child: const Icon(
-                              Icons.broken_image,
-                              color: Constants.textSecondary,
-                              size: 48,
-                            ),
-                          );
-                        },
+                  ),
+                  if (announcement.isActive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppConstants.spacingS,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Constants.success,
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusS),
+                      ),
+                      child: const Text(
+                        'Active',
+                        style: TextStyle(
+                          color: Constants.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  );
-                },
+                ],
               ),
             ),
 
-          const SizedBox(height: AppConstants.spacingS),
-        ],
+            // Title
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
+              child: Text(
+                announcement.title,
+                style: const TextStyle(
+                  color: Constants.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: AppConstants.spacingS),
+
+            // Description
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppConstants.spacingM),
+              child: Text(
+                announcement.description,
+                style: const TextStyle(
+                  color: Constants.textSecondary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+            ),
+
+            // Images if available
+            if (announcement.images.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.all(AppConstants.spacingM),
+                height: 200,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: announcement.images.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: EdgeInsets.only(
+                        right: index < announcement.images.length - 1
+                            ? AppConstants.spacingS
+                            : 0,
+                      ),
+                      width: 300,
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusM),
+                      ),
+                      child: ClipRRect(
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusM),
+                        child: Image.network(
+                          announcement.images[index].fullUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Constants.greyDark,
+                              child: const Icon(
+                                Icons.broken_image,
+                                color: Constants.textSecondary,
+                                size: 48,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+            // View details/comments indicator
+            Padding(
+              padding: const EdgeInsets.all(AppConstants.spacingM),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.comment_outlined,
+                        size: 18,
+                        color: Constants.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'View Comments',
+                        style: TextStyle(
+                          color: Constants.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: Constants.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: AppConstants.spacingS),
+          ],
+        ),
       ),
     );
   }
@@ -517,5 +578,230 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     } else {
       return 'Just now';
     }
+  }
+
+  // Build announcement detail view with comments (inline, like home page pattern)
+  Widget _buildAnnouncementDetail() {
+    if (_selectedAnnouncement == null) return Container();
+
+    return Container(
+      color: Constants.background,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // Back button and header
+          Container(
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            decoration: BoxDecoration(
+              color: Constants.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Constants.black.withOpacity(0.1),
+                  blurRadius: AppConstants.elevationS,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _showAnnouncementDetail = false;
+                      _selectedAnnouncement = null;
+                    });
+                  },
+                  icon: Icon(
+                    Icons.arrow_back,
+                    color: Constants.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: AppConstants.spacingS),
+                Expanded(
+                  child: Text(
+                    'Announcement Details',
+                    style: TextStyle(
+                      color: Constants.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Announcement images
+          if (_selectedAnnouncement!.images.isNotEmpty)
+            Container(
+              height: 250,
+              color: Constants.greyDark,
+              child: PageView.builder(
+                itemCount: _selectedAnnouncement!.images.length,
+                itemBuilder: (context, index) {
+                  final image = _selectedAnnouncement!.images[index];
+                  return Image.network(
+                    image.fullUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Constants.greyDark,
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          size: 64,
+                          color: Constants.textSecondary,
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+
+          // Announcement content
+          Container(
+            color: Constants.surface,
+            padding: const EdgeInsets.all(AppConstants.spacingL),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // User info and date
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Constants.primary,
+                      radius: 24,
+                      child: Text(
+                        _selectedAnnouncement!.user?.name
+                                .substring(0, 1)
+                                .toUpperCase() ??
+                            'A',
+                        style: const TextStyle(
+                          color: Constants.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppConstants.spacingM),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _selectedAnnouncement!.user?.name ??
+                                'Administrator',
+                            style: const TextStyle(
+                              color: Constants.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 14,
+                                color: Constants.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDate(_selectedAnnouncement!.createdAt),
+                                style: const TextStyle(
+                                  color: Constants.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_selectedAnnouncement!.isActive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppConstants.spacingS,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Constants.success,
+                          borderRadius:
+                              BorderRadius.circular(AppConstants.radiusS),
+                        ),
+                        child: const Text(
+                          'Active',
+                          style: TextStyle(
+                            color: Constants.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingL),
+
+                // Title
+                Text(
+                  _selectedAnnouncement!.title,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Constants.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppConstants.spacingM),
+
+                // Description
+                Text(
+                  _selectedAnnouncement!.description,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Constants.textSecondary,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppConstants.spacingS),
+
+          // Comments Section
+          Container(
+            color: Constants.surface,
+            padding: const EdgeInsets.all(AppConstants.spacingM),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.comment,
+                      color: Constants.primary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Text(
+                      'Comments',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Constants.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingM),
+                CommentsSection(
+                  announcementId: _selectedAnnouncement!.id,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
