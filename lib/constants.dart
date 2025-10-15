@@ -98,7 +98,11 @@ class AppConstants {
 // Form Validators
 final passwordValidator = MultiValidator([
   RequiredValidator(errorText: 'Password is required'),
-  MinLengthValidator(8, errorText: 'password must be at least 8 digits long'),
+  MinLengthValidator(8, errorText: 'Password must be at least 8 characters long'),
+  PatternValidator(r'(?=.*[A-Z])', errorText: 'Password must have at least one uppercase letter'),
+  PatternValidator(r'(?=.*[a-z])', errorText: 'Password must have at least one lowercase letter'),
+  PatternValidator(r'(?=.*\d)', errorText: 'Password must have at least one digit'),
+  PatternValidator(r'(?=.*[!@#\$&*~_.,;:^%()\[\]\{\}\-\+=<>?/|])', errorText: 'Password must have at least one special character'),
 ]);
 
 final emaildValidator = MultiValidator([
