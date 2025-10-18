@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:math'; // added for bounds calculation
 
 import '../constants.dart';
 import '../models/crime_report_model.dart';
@@ -25,11 +26,20 @@ class _ReportPageState extends State<ReportPage> {
 
   final List<String> _severityOptions = ['All', 'High', 'Medium', 'Low'];
 
+  // Search controller and state
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
     _loadCrimeReports();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -51,13 +61,29 @@ class _ReportPageState extends State<ReportPage> {
     }
   }
 
-  Future<void> _loadCrimeReports() async {
+  Future<void> _loadCrimeReports({String? search}) async {
     setState(() {
       _isLoadingReports = true;
     });
 
     try {
-      final result = await CrimeReportService.getReports();
+      // derive severity param (api expects severity values, skip 'All')
+      String? severityParam;
+      if (_selectedSeverity != null && _selectedSeverity != 'All') {
+        severityParam = _selectedSeverity;
+      }
+
+      // Include current location if available
+      double? lat = _currentLocation?.latitude;
+      double? lng = _currentLocation?.longitude;
+
+      final result = await CrimeReportService.getReportsWithFilters(
+        severity: severityParam,
+        lat: lat,
+        lng: lng,
+        search: search,
+      );
+
       if (result['success'] == true) {
         setState(() {
           _crimeReports = result['reports'] ?? [];
@@ -90,17 +116,10 @@ class _ReportPageState extends State<ReportPage> {
   void _updateMapMarkers() {
     Set<Marker> newMarkers = {};
 
-    // Filter reports based on selected severity and visibility toggle
+    // Add crime report markers - no local filtering since API handles all filters
     if (_showCrimeReports) {
-      List<CrimeReport> filteredReports = _crimeReports;
-      if (_selectedSeverity != null && _selectedSeverity != 'All') {
-        filteredReports = _crimeReports
-            .where((report) => report.severity.toLowerCase() == _selectedSeverity!.toLowerCase())
-            .toList();
-      }
-
-      // Add crime report markers
-      for (final crime in filteredReports) {
+      // Add crime report markers (already filtered by API)
+      for (final crime in _crimeReports) {
         newMarkers.add(
           Marker(
             markerId: MarkerId('crime_${crime.id}'),
@@ -119,6 +138,49 @@ class _ReportPageState extends State<ReportPage> {
     setState(() {
       _markers = newMarkers;
     });
+
+    // Animate camera to fit markers when they change (supports search results)
+    if (_mapController != null && newMarkers.isNotEmpty) {
+      try {
+        final positions = newMarkers.map((m) => m.position).toList();
+        double south = positions.map((p) => p.latitude).reduce(min);
+        double north = positions.map((p) => p.latitude).reduce(max);
+        double west = positions.map((p) => p.longitude).reduce(min);
+        double east = positions.map((p) => p.longitude).reduce(max);
+
+        // If single point, expand bounds a little
+        if (south == north && west == east) {
+          const double delta = 0.01; // ~1km depending on lat
+          south = south - delta;
+          north = north + delta;
+          west = west - delta;
+          east = east + delta;
+        }
+
+        final bounds = LatLngBounds(
+          southwest: LatLng(south, west),
+          northeast: LatLng(north, east),
+        );
+
+        // add some padding
+        _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
+      } catch (e) {
+        // Fallback: move to first marker if bounds calculation/animation fails
+        try {
+          final first = newMarkers.first.position;
+          _mapController!.animateCamera(CameraUpdate.newLatLngZoom(first, 14.0));
+        } catch (_) {
+          // ignore
+        }
+      }
+    } else if (_mapController != null && newMarkers.isEmpty && _currentLocation != null) {
+      // If no markers (e.g., search returned nothing), reset to user's location
+      try {
+        _mapController!.animateCamera(CameraUpdate.newLatLngZoom(_currentLocation!, 12.0));
+      } catch (_) {
+        // ignore
+      }
+    }
   }
 
   BitmapDescriptor _getCrimeMarkerIcon(String severity) {
@@ -282,7 +344,7 @@ class _ReportPageState extends State<ReportPage> {
                     ),
                     const SizedBox(width: AppConstants.spacingS),
                     Text(
-                      'Crime Reports (${_crimeReports.length})',
+                      'AI Crime Map (${_crimeReports.length})',
                       style: TextStyle(
                         color: Constants.textPrimary,
                         fontSize: 18,
@@ -310,13 +372,62 @@ class _ReportPageState extends State<ReportPage> {
                       )
                     else
                       IconButton(
-                        onPressed: _loadCrimeReports,
+                        onPressed: () => _loadCrimeReports(search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim()),
                         icon: Icon(
                           Icons.refresh,
                           color: Constants.primary,
                         ),
                         tooltip: 'Refresh reports',
                       ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingS),
+
+                // Search bar
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: Constants.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Search reports by title, description, address or reporter',
+                          hintStyle: TextStyle(color: Constants.textSecondary),
+                          filled: true,
+                          fillColor: Constants.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                            borderSide: BorderSide(color: Constants.greyDark),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.clear, color: Constants.textSecondary),
+                                onPressed: () {
+                                  if (_searchController.text.isNotEmpty) {
+                                    _searchController.clear();
+                                    _loadCrimeReports(); // refresh without search
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.search, color: Constants.primary),
+                                onPressed: () {
+                                  final q = _searchController.text.trim();
+                                  _loadCrimeReports(search: q.isEmpty ? null : q);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        onSubmitted: (value) {
+                          final q = value.trim();
+                          _loadCrimeReports(search: q.isEmpty ? null : q);
+                        },
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppConstants.spacingS),
@@ -369,7 +480,9 @@ class _ReportPageState extends State<ReportPage> {
                         onChanged: (value) {
                           setState(() {
                             _selectedSeverity = value;
-                            _updateMapMarkers();
+                            // reload with current search if any
+                            final q = _searchController.text.trim();
+                            _loadCrimeReports(search: q.isEmpty ? null : q);
                           });
                         },
                         hint: Text(
@@ -435,3 +548,4 @@ class _ReportPageState extends State<ReportPage> {
     );
   }
 }
+
