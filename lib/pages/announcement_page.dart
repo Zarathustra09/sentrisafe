@@ -580,227 +580,271 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
-  // Build announcement detail view with comments (inline, like home page pattern)
+  Future<void> _refreshAnnouncementDetail() async {
+    if (_selectedAnnouncement == null) return;
+
+    // Reload the specific announcement
+    final result = await AnnouncementService.getAnnouncementById(
+      _selectedAnnouncement!.id,
+    );
+
+    if (mounted) {
+      if (result['success']) {
+        setState(() {
+          _selectedAnnouncement = result['announcement'];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Announcement refreshed'),
+            backgroundColor: Constants.success,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['error'] ?? 'Failed to refresh'),
+            backgroundColor: Constants.error,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  // Build announcement detail view with comments (inline, matching Emergency Contacts design)
   Widget _buildAnnouncementDetail() {
     if (_selectedAnnouncement == null) return Container();
 
     return Container(
       color: Constants.background,
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          // Back button and header
-          Container(
-            padding: const EdgeInsets.all(AppConstants.spacingM),
-            decoration: BoxDecoration(
-              color: Constants.surface,
-              boxShadow: [
-                BoxShadow(
-                  color: Constants.black.withOpacity(0.1),
-                  blurRadius: AppConstants.elevationS,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _showAnnouncementDetail = false;
-                      _selectedAnnouncement = null;
-                    });
-                  },
-                  icon: Icon(
-                    Icons.arrow_back,
-                    color: Constants.textPrimary,
+      child: RefreshIndicator(
+        onRefresh: _refreshAnnouncementDetail,
+        color: Constants.primary,
+        backgroundColor: Constants.surface,
+        strokeWidth: 3,
+        displacement: 50,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          children: [
+            // Back Button and Header (matching Emergency Contacts)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppConstants.spacingM,
+                vertical: AppConstants.spacingS,
+              ),
+              color: Constants.background,
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _showAnnouncementDetail = false;
+                        _selectedAnnouncement = null;
+                      });
+                    },
+                    icon: Icon(Icons.arrow_back, color: Constants.textPrimary),
                   ),
-                ),
-                const SizedBox(width: AppConstants.spacingS),
-                Expanded(
-                  child: Text(
-                    'Announcement Details',
-                    style: TextStyle(
-                      color: Constants.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: AppConstants.spacingS),
+                  Icon(Icons.campaign, color: Constants.primary, size: 24),
+                  const SizedBox(width: AppConstants.spacingS),
+                  Expanded(
+                    child: Text(
+                      'Announcement Details',
+                      style: TextStyle(
+                        color: Constants.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-
-          // Announcement images
-          if (_selectedAnnouncement!.images.isNotEmpty)
-            Container(
-              height: 250,
-              color: Constants.greyDark,
-              child: PageView.builder(
-                itemCount: _selectedAnnouncement!.images.length,
-                itemBuilder: (context, index) {
-                  final image = _selectedAnnouncement!.images[index];
-                  return Image.network(
-                    image.fullUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Constants.greyDark,
-                        child: const Icon(
-                          Icons.image_not_supported,
-                          size: 64,
-                          color: Constants.textSecondary,
-                        ),
-                      );
-                    },
-                  );
-                },
+                ],
               ),
             ),
 
-          // Announcement content
-          Container(
-            color: Constants.surface,
-            padding: const EdgeInsets.all(AppConstants.spacingL),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // User info and date
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Constants.primary,
-                      radius: 24,
-                      child: Text(
-                        _selectedAnnouncement!.user?.name
-                                .substring(0, 1)
-                                .toUpperCase() ??
-                            'A',
-                        style: const TextStyle(
-                          color: Constants.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+            // Main Content Card (Twitter-style layout, full width)
+            Container(
+              padding: const EdgeInsets.all(AppConstants.spacingL),
+              decoration: BoxDecoration(
+                color: Constants.surface,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. User Profile Header (Twitter-style)
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Constants.primary,
+                        radius: 24,
+                        child: Text(
+                          _selectedAnnouncement!.user?.name
+                                  .substring(0, 1)
+                                  .toUpperCase() ??
+                              'A',
+                          style: const TextStyle(
+                            color: Constants.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: AppConstants.spacingM),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _selectedAnnouncement!.user?.name ??
-                                'Administrator',
-                            style: const TextStyle(
-                              color: Constants.textPrimary,
+                      const SizedBox(width: AppConstants.spacingM),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedAnnouncement!.user?.name ?? 'Unknown',
+                              style: TextStyle(
+                                color: Constants.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '@${_selectedAnnouncement!.user?.name.toLowerCase().replaceAll(' ', '') ?? 'admin'}',
+                              style: TextStyle(
+                                color: Constants.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_selectedAnnouncement!.isActive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppConstants.spacingS,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Constants.success,
+                            borderRadius:
+                                BorderRadius.circular(AppConstants.radiusS),
+                          ),
+                          child: const Text(
+                            'Active',
+                            style: TextStyle(
+                              color: Constants.white,
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.access_time,
-                                size: 14,
-                                color: Constants.textSecondary,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDate(_selectedAnnouncement!.createdAt),
-                                style: const TextStyle(
-                                  color: Constants.textSecondary,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_selectedAnnouncement!.isActive)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppConstants.spacingS,
-                          vertical: 6,
                         ),
-                        decoration: BoxDecoration(
-                          color: Constants.success,
-                          borderRadius:
-                              BorderRadius.circular(AppConstants.radiusS),
-                        ),
-                        child: const Text(
-                          'Active',
-                          style: TextStyle(
-                            color: Constants.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppConstants.spacingL),
-
-                // Title
-                Text(
-                  _selectedAnnouncement!.title,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Constants.textPrimary,
+                    ],
                   ),
-                ),
-                const SizedBox(height: AppConstants.spacingM),
 
-                // Description
-                Text(
-                  _selectedAnnouncement!.description,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Constants.textSecondary,
-                    height: 1.6,
-                  ),
-                ),
-              ],
-            ),
-          ),
+                  const SizedBox(height: AppConstants.spacingL),
 
-          const SizedBox(height: AppConstants.spacingS),
-
-          // Comments Section
-          Container(
-            color: Constants.surface,
-            padding: const EdgeInsets.all(AppConstants.spacingM),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.comment,
-                      color: Constants.primary,
-                      size: 22,
+                  // 2. Title
+                  Text(
+                    _selectedAnnouncement!.title,
+                    style: TextStyle(
+                      color: Constants.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
-                    const SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'Comments',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Constants.textPrimary,
+                  ),
+
+                  const SizedBox(height: AppConstants.spacingM),
+
+                  // 3. Description
+                  Text(
+                    _selectedAnnouncement!.description,
+                    style: TextStyle(
+                      color: Constants.textPrimary,
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: AppConstants.spacingL),
+
+                  // 4. Images (if available)
+                  if (_selectedAnnouncement!.images.isNotEmpty) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                      child: SizedBox(
+                        height: 300,
+                        child: PageView.builder(
+                          itemCount: _selectedAnnouncement!.images.length,
+                          itemBuilder: (context, index) {
+                            final image = _selectedAnnouncement!.images[index];
+                            return Image.network(
+                              image.fullUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Constants.greyDark,
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    size: 64,
+                                    color: Constants.textSecondary,
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ),
                     ),
+                    const SizedBox(height: AppConstants.spacingM),
                   ],
-                ),
-                const SizedBox(height: AppConstants.spacingM),
-                CommentsSection(
-                  announcementId: _selectedAnnouncement!.id,
-                ),
-              ],
+
+                  // 5. Time/Date (at the bottom, Twitter-style)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: Constants.textSecondary,
+                      ),
+                      const SizedBox(width: AppConstants.spacingXS),
+                      Text(
+                        _formatDate(_selectedAnnouncement!.createdAt),
+                        style: TextStyle(
+                          color: Constants.textSecondary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: AppConstants.spacingL),
+
+                  // Divider before comments
+                  Divider(color: Constants.greyDark, height: 1),
+
+                  const SizedBox(height: AppConstants.spacingL),
+
+                  // Comments Section Header
+                  Row(
+                    children: [
+                      Icon(Icons.comment, color: Constants.primary, size: 24),
+                      const SizedBox(width: AppConstants.spacingS),
+                      Text(
+                        'Comments',
+                        style: TextStyle(
+                          color: Constants.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppConstants.spacingS),
+
+                  // Comments Section
+                  CommentsSection(
+                    announcementId: _selectedAnnouncement!.id,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

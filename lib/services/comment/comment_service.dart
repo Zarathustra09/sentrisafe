@@ -126,8 +126,8 @@ class CommentService {
 
       final requestBody = {
         'content': content,
-        if (parentId != null)
-          'parent_id': parentId, // Include parent_id if provided
+        'parent_id':
+            parentId, // Always include parent_id (null for top-level comments)
       };
 
       final response = await http.post(
@@ -142,42 +142,56 @@ class CommentService {
 
       print('Add comment response: ${response.body}');
       print('Add comment status code: ${response.statusCode}');
+      print('Request body was: ${jsonEncode(requestBody)}');
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         try {
           final data = jsonDecode(response.body);
           print('Parsed add comment data: $data');
+          print('Data keys: ${data.keys}');
+          print('Has comment key: ${data.containsKey('comment')}');
+          print('Has data key: ${data.containsKey('data')}');
+          print('Has success key: ${data.containsKey('success')}');
+          print('Success value: ${data['success']}');
+
+          // Check if the API response itself indicates failure
+          if (data['success'] == false) {
+            print('API returned success=false in response body!');
+            return {
+              'success': false,
+              'error':
+                  data['message'] ?? data['error'] ?? 'Failed to add comment',
+            };
+          }
 
           // Handle different response formats
           Comment? comment;
-          String? message;
+          String? message = data['message'];
 
           if (data['comment'] != null) {
+            print('Parsing from data[comment]');
             comment = Comment.fromJson(data['comment']);
-            message = data['message'];
           } else if (data['data'] != null) {
+            print('Parsing from data[data]');
             comment = Comment.fromJson(data['data']);
-            message = data['message'];
+          } else {
+            print('WARNING: No comment found in response! Full data: $data');
           }
 
-          if (comment != null) {
-            return {
-              'success': true,
-              'comment': comment,
-              'message': message ?? 'Comment added successfully',
-            };
-          } else {
-            return {
-              'success': false,
-              'error': 'Comment was added but response format is unexpected'
-            };
-          }
-        } catch (parseError) {
+          // Always return success for 200/201 status codes
+          // The comment was added successfully even if we can't parse the response
+          return {
+            'success': true,
+            if (comment != null) 'comment': comment,
+            'message': message ?? 'Comment added successfully',
+          };
+        } catch (parseError, stackTrace) {
           print('Parse error in addComment: $parseError');
+          print('Stack trace: $stackTrace');
           // Comment might have been added successfully but we can't parse response
           return {
             'success': true,
-            'message': 'Comment added (response parsing failed)',
+            'message': 'Comment added successfully',
           };
         }
       } else {
