@@ -345,6 +345,7 @@ class CrimeReportService {
     double? lat,
     double? lng,
     double? radius,
+    String? search,
     int page = 1,
   }) async {
     if (!await _isConnected()) {
@@ -366,6 +367,9 @@ class CrimeReportService {
       if (lat != null) queryParams['lat'] = lat.toString();
       if (lng != null) queryParams['lng'] = lng.toString();
       if (radius != null) queryParams['radius'] = radius.toString();
+      if (search != null && search.trim().isNotEmpty) {
+        queryParams['search'] = search.trim();
+      }
 
       final uri = Uri.parse('$baseUrl/crime-reports').replace(queryParameters: queryParams);
       print('Request URL: $uri');
