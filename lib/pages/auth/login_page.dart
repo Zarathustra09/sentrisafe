@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:form_field_validator/form_field_validator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../constants.dart';
 import '../../route/route_constant.dart';
 import '../../services/auth/auth_service.dart';
@@ -56,6 +57,23 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
       }
+    }
+  }
+
+  // New helper: opens the forgot-password URL defined in constants
+  Future<void> _openForgotPassword() async {
+    final uri = Uri.parse(Constants.forgotPasswordUrl);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open link'), backgroundColor: Constants.error),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error opening link'), backgroundColor: Constants.error),
+      );
     }
   }
 
@@ -196,7 +214,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(height: AppConstants.spacingM),
                         TextButton(
-                          onPressed: () {},
+                          onPressed: _openForgotPassword,
                           child: Text(
                             'Forgot Password?',
                             style: Theme.of(context).textTheme.bodyMedium!

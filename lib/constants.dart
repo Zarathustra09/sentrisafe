@@ -55,6 +55,9 @@ class Constants {
     Color(0xFF4FC3F7),
     Color(0xFF29B6F6),
   ];
+
+  // URLs
+  static const String forgotPasswordUrl = 'https://sentrisafe.net/password/reset';
 }
 
 class AppConstants {
