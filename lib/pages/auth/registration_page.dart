@@ -18,6 +18,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
   final _passwordController = TextEditingController();
   final _retypePasswordController = TextEditingController();
   File? _idImage;
@@ -30,6 +31,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
     _passwordController.dispose();
     _retypePasswordController.dispose();
     super.dispose();
@@ -67,6 +69,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
         password: _passwordController.text,
         passwordConfirmation: _retypePasswordController.text,
         idImage: _idImage!,
+        address: _addressController.text.trim(),
       );
 
       setState(() {
@@ -123,9 +126,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   Text(
                     "Create Account",
                     style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Constants.textPrimary,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: Constants.textPrimary,
+                        ),
                   ),
                   SizedBox(height: constraints.maxHeight * 0.04),
                   Form(
@@ -201,6 +204,30 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           style: const TextStyle(color: Constants.textPrimary),
                           validator: RequiredValidator(
                             errorText: 'Phone is required',
+                          ).call,
+                        ),
+                        SizedBox(height: AppConstants.spacingM),
+                        TextFormField(
+                          controller: _addressController,
+                          decoration: InputDecoration(
+                            hintText: 'Address',
+                            filled: true,
+                            fillColor: Constants.surface,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppConstants.spacingM * 1.5,
+                              vertical: AppConstants.spacingM,
+                            ),
+                            border: const OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(AppConstants.radiusXL),
+                              ),
+                            ),
+                            hintStyle: TextStyle(color: Constants.textHint),
+                          ),
+                          style: const TextStyle(color: Constants.textPrimary),
+                          validator: RequiredValidator(
+                            errorText: 'Address is required',
                           ).call,
                         ),
                         SizedBox(height: AppConstants.spacingM),
@@ -375,7 +402,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                                 ),
                               ],
                             ),
-                            style: Theme.of(context).textTheme.bodyMedium!
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium!
                                 .copyWith(color: Constants.textSecondary),
                           ),
                         ),

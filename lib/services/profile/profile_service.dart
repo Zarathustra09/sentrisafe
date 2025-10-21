@@ -59,6 +59,8 @@ class ProfileService {
   static Future<Map<String, dynamic>> updateProfile({
     required String name,
     required String email,
+    String? password,
+    required String address,
     File? profilePicture,
   }) async {
     if (!await _isConnected()) {
@@ -70,18 +72,26 @@ class ProfileService {
     try {
       final token = await AuthService.getAuthToken();
       var uri = Uri.parse('$baseUrl/profile');
-      var request = http.MultipartRequest('PUT', uri);
+      var request = http.MultipartRequest('POST', uri);
 
       request.headers.addAll({
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
       });
 
+      // Laravel workaround for PUT with multipart data
+      request.fields['_method'] = 'PUT';
       request.fields['name'] = name;
       request.fields['email'] = email;
+      request.fields['address'] = address;
+
+      if (password != null && password.isNotEmpty) {
+        request.fields['password'] = password;
+      }
 
       if (profilePicture != null) {
-        String fileExtension = profilePicture.path.split('.').last.toLowerCase();
+        String fileExtension =
+            profilePicture.path.split('.').last.toLowerCase();
         String mimeType = fileExtension == 'png' ? 'png' : 'jpeg';
 
         request.files.add(

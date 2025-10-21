@@ -95,7 +95,8 @@ class AuthService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_fcmTokenKey, token);
-      await prefs.setString(_tokenTimestampKey, DateTime.now().toIso8601String());
+      await prefs.setString(
+          _tokenTimestampKey, DateTime.now().toIso8601String());
       _log('FCM token saved locally with timestamp');
     } catch (e) {
       _logError('_saveFCMToken', e);
@@ -153,6 +154,7 @@ class AuthService {
       return 'unknown';
     }
   }
+
 // Update the initializeFCM method
   static Future<void> initializeFCM() async {
     try {
@@ -170,7 +172,6 @@ class AuthService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-
         await _handleTokenRefresh();
 
         // Listen for token refresh
@@ -179,7 +180,6 @@ class AuthService {
         // Set up message handling
         await setupForegroundMessageHandling();
         await setupMessageInteractionHandling();
-
       } else {
         _log('FCM permission denied');
       }
@@ -187,7 +187,6 @@ class AuthService {
       _logError('initializeFCM', e);
     }
   }
-
 
   static Future<void> _handleTokenRefresh([String? newToken]) async {
     try {
@@ -205,7 +204,8 @@ class AuthService {
 
       // Update token if it's new, different, or stale
       if (storedToken != currentToken || isTokenStale) {
-        _log('Token needs update - New: ${storedToken != currentToken}, Stale: $isTokenStale');
+        _log(
+            'Token needs update - New: ${storedToken != currentToken}, Stale: $isTokenStale');
         await _saveFCMToken(currentToken);
 
         // Only register with server if user is logged in
@@ -365,7 +365,8 @@ class AuthService {
         await _saveFCMToken(token);
         return {'success': true, 'message': data['message']};
       } else {
-        _logError('Device token registration failed', 'Status: ${response.statusCode}, Response: ${response.body}');
+        _logError('Device token registration failed',
+            'Status: ${response.statusCode}, Response: ${response.body}');
         return {
           'success': false,
           'error': data['error'] ?? 'Device token registration failed'
@@ -373,10 +374,7 @@ class AuthService {
       }
     } catch (e) {
       _logError('registerDeviceToken', e);
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -390,7 +388,8 @@ class AuthService {
         return {'success': false, 'error': 'No auth token found'};
       }
 
-      String? fcmToken = await _getStoredFCMToken() ?? await _messaging.getToken();
+      String? fcmToken =
+          await _getStoredFCMToken() ?? await _messaging.getToken();
       if (fcmToken == null) {
         _log('No FCM token found for removal');
         return {'success': false, 'error': 'No FCM token found'};
@@ -422,7 +421,8 @@ class AuthService {
 
         return {'success': true, 'message': data['message']};
       } else {
-        _logError('Device token removal failed', 'Status: ${response.statusCode}, Response: ${response.body}');
+        _logError('Device token removal failed',
+            'Status: ${response.statusCode}, Response: ${response.body}');
         return {
           'success': false,
           'error': data['error'] ?? 'Device token removal failed'
@@ -430,10 +430,7 @@ class AuthService {
       }
     } catch (e) {
       _logError('removeDeviceToken', e);
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -443,6 +440,7 @@ class AuthService {
     required String password,
     required String passwordConfirmation,
     required File idImage,
+    required String address,
   }) async {
     try {
       _log('Starting user registration');
@@ -463,6 +461,7 @@ class AuthService {
       request.fields['email'] = email;
       request.fields['password'] = password;
       request.fields['password_confirmation'] = passwordConfirmation;
+      request.fields['address'] = address;
 
       if (fcmToken != null) {
         request.fields['fcm_token'] = fcmToken;
@@ -506,7 +505,8 @@ class AuthService {
 
         return {'success': true, 'token': data['token'], 'user': data['user']};
       } else {
-        _logError('Registration failed', 'Status: ${response.statusCode}, Response: ${response.body}');
+        _logError('Registration failed',
+            'Status: ${response.statusCode}, Response: ${response.body}');
         return {
           'success': false,
           'errors': data['errors'] ?? {'general': 'Registration failed'},
@@ -564,7 +564,15 @@ class AuthService {
       if (response.statusCode == 200) {
         _log('Login successful');
         int userId = int.parse(data['user_id'].toString());
-        await _saveAuthData(data['token'], userId);
+        String token = data['token'];
+
+        // Check if user is verified
+        if (data['user'] != null && data['user']['is_verified'] == 0) {
+          _log('User not verified');
+          return {'success': false, 'error': 'User is not yet verified'};
+        }
+
+        await _saveAuthData(token, userId);
 
         // Save FCM token locally if available
         if (fcmToken != null) {
@@ -576,12 +584,21 @@ class AuthService {
 
         return {
           'success': true,
-          'token': data['token'],
+          'token': token,
           'user_id': userId,
         };
       } else {
-        _logError('Login failed', 'Status: ${response.statusCode}, Response: ${response.body}');
-        return {'success': false, 'error': data['error'] ?? 'Login failed'};
+        _logError('Login failed',
+            'Status: ${response.statusCode}, Response: ${response.body}');
+        String errorMessage = data['error'] ?? 'Login failed';
+        // Map specific errors
+        if (errorMessage.toLowerCase().contains('credential') ||
+            errorMessage.toLowerCase().contains('password') ||
+            errorMessage.toLowerCase().contains('invalid') ||
+            errorMessage.toLowerCase().contains('unauthorized')) {
+          errorMessage = 'These credentials do not match our records';
+        }
+        return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
       _logError('login', e);
@@ -601,7 +618,8 @@ class AuthService {
       }
 
       // Get FCM token for removal
-      String? fcmToken = await _getStoredFCMToken() ?? await _messaging.getToken();
+      String? fcmToken =
+          await _getStoredFCMToken() ?? await _messaging.getToken();
 
       _log('Sending logout request to server');
       final response = await http.post(
@@ -636,7 +654,6 @@ class AuthService {
     }
   }
 
-
 // Add these methods to your AuthService class
 
   static Future<void> setupForegroundMessageHandling() async {
@@ -655,7 +672,9 @@ class AuthService {
 
   static Future<void> setupMessageInteractionHandling() async {
     // Handle notification tap when app is terminated
-    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+    FirebaseMessaging.instance
+        .getInitialMessage()
+        .then((RemoteMessage? message) {
       if (message != null) {
         _log('App opened from terminated state via notification');
         _handleNotificationTap(message);
@@ -696,8 +715,4 @@ class AuthService {
         _log('User tapped unknown notification type: $notificationType');
     }
   }
-
-
-
-
 }

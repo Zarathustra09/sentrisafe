@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:sentrisafe/models/announcement_model.dart';
 import 'package:sentrisafe/services/announcement/announcement_service.dart';
+import 'package:sentrisafe/services/shared_preferences.dart';
 import 'package:sentrisafe/widgets/comments_section.dart';
+import 'package:sentrisafe/widgets/community_guidelines_dialog.dart';
 import '../constants.dart';
 
 class AnnouncementPage extends StatefulWidget {
-  const AnnouncementPage({Key? key}) : super(key: key);
+  final bool isVisible;
+
+  const AnnouncementPage({Key? key, this.isVisible = false}) : super(key: key);
 
   @override
   State<AnnouncementPage> createState() => _AnnouncementPageState();
 }
 
-class _AnnouncementPageState extends State<AnnouncementPage> {
+class _AnnouncementPageState extends State<AnnouncementPage>
+    with AutomaticKeepAliveClientMixin {
   List<Announcement> announcements = [];
   bool isLoading = true;
   bool hasError = false;
@@ -24,12 +29,56 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   // For showing announcement details with comments
   bool _showAnnouncementDetail = false;
   Announcement? _selectedAnnouncement;
+  bool _hasCheckedGuidelines = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     _loadAnnouncements();
     _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(AnnouncementPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Check if page became visible
+    if (!oldWidget.isVisible && widget.isVisible && !_hasCheckedGuidelines) {
+      _checkAndShowGuidelines();
+    }
+  }
+
+  Future<void> _checkAndShowGuidelines() async {
+    _hasCheckedGuidelines = true;
+    final hasSeenGuidelines = await SharedPrefService.getHasSeenGuidelines();
+    if (!hasSeenGuidelines && mounted && widget.isVisible) {
+      // Show guidelines after a small delay
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted && widget.isVisible) {
+          _showGuidelinesDialog();
+        }
+      });
+    }
+  }
+
+  void _showGuidelinesDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: CommunityGuidelinesDialog(
+            onAccept: () async {
+              await SharedPrefService.setHasSeenGuidelines(true);
+              Navigator.of(context).pop();
+            },
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -114,6 +163,8 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     // Similar pattern to home_page.dart
     if (_showAnnouncementDetail && _selectedAnnouncement != null) {
       return _buildAnnouncementDetail();
@@ -323,6 +374,48 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 ),
               ),
               Spacer(),
+              // Reset guidelines button (for testing) - HIDDEN
+              // IconButton(
+              //   icon: Icon(
+              //     Icons.refresh,
+              //     color: Constants.warning,
+              //     size: 20,
+              //   ),
+              //   tooltip: 'Reset Guidelines (Testing)',
+              //   onPressed: () async {
+              //     await SharedPrefService.resetGuidelines();
+              //     setState(() {
+              //       _hasCheckedGuidelines = false;
+              //     });
+              //     ScaffoldMessenger.of(context).showSnackBar(
+              //       SnackBar(
+              //         content: Text(
+              //             'Guidelines reset! Leave and come back to see it again.'),
+              //         backgroundColor: Constants.success,
+              //         duration: Duration(seconds: 2),
+              //       ),
+              //     );
+              //   },
+              // ),
+              IconButton(
+                icon: Icon(
+                  Icons.gavel,
+                  color: Constants.primary,
+                ),
+                tooltip: 'Community Guidelines',
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return CommunityGuidelinesDialog(
+                        onAccept: () {
+                          Navigator.of(context).pop();
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
               Text(
                 '${announcements.length} item${announcements.length != 1 ? 's' : ''}',
                 style: TextStyle(

@@ -17,13 +17,6 @@ class EntryPointPage extends StatefulWidget {
 class _EntryPointPageState extends State<EntryPointPage> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    HomePage(),
-    MapPage(),
-    ReportPage(), // Use the actual ReportPage
-    AnnouncementPage(),
-  ];
-
   void _onTabChanged(int index) {
     setState(() {
       _selectedIndex = index;
@@ -40,7 +33,12 @@ class _EntryPointPageState extends State<EntryPointPage> {
       ),
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: [
+          HomePage(),
+          MapPage(),
+          ReportPage(),
+          AnnouncementPage(isVisible: _selectedIndex == 3),
+        ],
       ),
       bottomNavigationBar: BottomNavbar(
         initialIndex: _selectedIndex,

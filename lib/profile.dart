@@ -17,6 +17,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String name = "";
   String email = "";
   String? profileImageUrl;
+  String address = "";
   bool isVerified = false;
 
   // Crime reports data - using raw Map data
@@ -30,6 +31,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _addressController = TextEditingController();
   bool isEditing = false;
   bool isLoading = true;
   int? selectedReportIdx;
@@ -45,6 +48,8 @@ class _ProfilePageState extends State<ProfilePage> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _passwordController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -59,9 +64,11 @@ class _ProfilePageState extends State<ProfilePage> {
         name = data['name'] ?? '';
         email = data['email'] ?? '';
         profileImageUrl = data['profile_picture'];
+        address = data['address'] ?? '';
         isVerified = data['is_verified'] ?? false;
         _nameController.text = name;
         _emailController.text = email;
+        _addressController.text = address;
         isLoading = false;
       });
     } else {
@@ -138,7 +145,8 @@ class _ProfilePageState extends State<ProfilePage> {
           current = pagination['current_page'] ?? 1;
           total = pagination['last_page'] ?? 1;
           totalCount = pagination['total'] ?? reports.length;
-          print('Processing custom service response with ${reports.length} reports');
+          print(
+              'Processing custom service response with ${reports.length} reports');
         }
       }
 
@@ -182,6 +190,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final result = await ProfileService.updateProfile(
       name: _nameController.text,
       email: _emailController.text,
+      password:
+          _passwordController.text.isNotEmpty ? _passwordController.text : null,
+      address: _addressController.text,
     );
 
     setState(() => isLoading = false);
@@ -192,6 +203,7 @@ class _ProfilePageState extends State<ProfilePage> {
         name = data['name'];
         email = data['email'];
         profileImageUrl = data['profile_picture'];
+        address = data['address'] ?? address;
         isEditing = false;
       });
       _showSuccess(result['message']);
@@ -434,13 +446,16 @@ class _ProfilePageState extends State<ProfilePage> {
                   Row(
                     children: [
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _getSeverityColor(report['severity']?.toString() ?? 'low'),
+                          color: _getSeverityColor(
+                              report['severity']?.toString() ?? 'low'),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          (report['severity']?.toString() ?? 'Unknown').toUpperCase(),
+                          (report['severity']?.toString() ?? 'Unknown')
+                              .toUpperCase(),
                           style: TextStyle(
                             color: Constants.white,
                             fontSize: 10,
@@ -450,13 +465,16 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       SizedBox(width: 8),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(report['status']?.toString() ?? 'pending'),
+                          color: _getStatusColor(
+                              report['status']?.toString() ?? 'pending'),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          (report['status']?.toString() ?? 'Pending').toUpperCase(),
+                          (report['status']?.toString() ?? 'Pending')
+                              .toUpperCase(),
                           style: TextStyle(
                             color: Constants.white,
                             fontSize: 10,
@@ -477,7 +495,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
               trailing: Icon(
-                isSelected ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                isSelected
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down,
                 color: Constants.textSecondary,
               ),
             ),
@@ -496,10 +516,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      report['description']?.toString() ?? 'No description available',
+                      report['description']?.toString() ??
+                          'No description available',
                       style: TextStyle(color: Constants.textSecondary),
                     ),
-                    if (report['address'] != null && report['address'].toString().isNotEmpty) ...[
+                    if (report['address'] != null &&
+                        report['address'].toString().isNotEmpty) ...[
                       SizedBox(height: 8),
                       Text(
                         'Location:',
@@ -527,7 +549,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       'Lat: ${double.tryParse(report['latitude']?.toString() ?? '0')?.toStringAsFixed(6) ?? '0.000000'}, Lng: ${double.tryParse(report['longitude']?.toString() ?? '0')?.toStringAsFixed(6) ?? '0.000000'}',
                       style: TextStyle(color: Constants.textSecondary),
                     ),
-                    if (report['report_image'] != null && report['report_image'].toString().isNotEmpty) ...[
+                    if (report['report_image'] != null &&
+                        report['report_image'].toString().isNotEmpty) ...[
                       SizedBox(height: 8),
                       Text(
                         'Evidence Photo:',
@@ -538,7 +561,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       SizedBox(height: 4),
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusS),
                         child: Image.network(
                           '$storageUrl/${report['report_image']}',
                           height: 150,
@@ -565,7 +589,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     SizedBox(height: 4),
                     Text(
-                      DateTime.tryParse(report['incident_date']?.toString() ?? '')?.toLocal().toString().split(' ')[0] ?? 'Unknown',
+                      DateTime.tryParse(
+                                  report['incident_date']?.toString() ?? '')
+                              ?.toLocal()
+                              .toString()
+                              .split(' ')[0] ??
+                          'Unknown',
                       style: TextStyle(color: Constants.textSecondary),
                     ),
                   ],
@@ -649,7 +678,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 dropdownColor: Constants.surface,
                 style: TextStyle(color: Constants.textPrimary),
-                items: ['pending', 'investigating', 'resolved', 'closed'].map((status) {
+                items: ['pending', 'investigating', 'resolved', 'closed']
+                    .map((status) {
                   return DropdownMenuItem(
                     value: status,
                     child: Text(status.toUpperCase()),
@@ -735,7 +765,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     Container(
                       decoration: BoxDecoration(
                         color: Constants.surfaceLight,
-                        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusM),
                         boxShadow: [
                           BoxShadow(
                             color: Constants.black.withOpacity(0.1),
@@ -883,7 +914,82 @@ class _ProfilePageState extends State<ProfilePage> {
                                         ),
                                       ),
                                 SizedBox(height: AppConstants.spacingS),
-                                // Edit Profile Button
+                                isEditing
+                                    ? TextField(
+                                        controller: _addressController,
+                                        style: TextStyle(
+                                          color: Constants.textPrimary,
+                                        ),
+                                        decoration: InputDecoration(
+                                          labelText: "Address",
+                                          labelStyle: TextStyle(
+                                            color: Constants.textSecondary,
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              AppConstants.radiusS,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Constants.primary,
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              AppConstants.radiusS,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Constants.primaryDark,
+                                            ),
+                                          ),
+                                          filled: true,
+                                          fillColor: Constants.surface,
+                                        ),
+                                      )
+                                    : Text(
+                                        address.isNotEmpty
+                                            ? address
+                                            : 'No address set',
+                                        style: TextStyle(
+                                          color: Constants.textPrimary,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                if (isEditing) ...[
+                                  SizedBox(height: AppConstants.spacingS),
+                                  TextField(
+                                    controller: _passwordController,
+                                    obscureText: true,
+                                    style: TextStyle(
+                                      color: Constants.textPrimary,
+                                    ),
+                                    decoration: InputDecoration(
+                                      labelText:
+                                          "New Password (leave empty to keep current)",
+                                      labelStyle: TextStyle(
+                                        color: Constants.textSecondary,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppConstants.radiusS,
+                                        ),
+                                        borderSide: BorderSide(
+                                          color: Constants.primary,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppConstants.radiusS,
+                                        ),
+                                        borderSide: BorderSide(
+                                          color: Constants.primaryDark,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Constants.surface,
+                                    ),
+                                  ),
+                                ],
+                                SizedBox(height: AppConstants.spacingS),
                                 Align(
                                   alignment: Alignment.centerLeft,
                                   child: ElevatedButton.icon(
@@ -900,9 +1006,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                         horizontal: AppConstants.spacingM,
                                       ),
                                     ),
-                                    icon: Icon(isEditing ? Icons.save : Icons.edit),
+                                    icon: Icon(
+                                        isEditing ? Icons.save : Icons.edit),
                                     label: Text(
-                                      isEditing ? "Save Profile" : "Edit Profile",
+                                      isEditing
+                                          ? "Save Profile"
+                                          : "Edit Profile",
                                     ),
                                     onPressed: () {
                                       if (isEditing) {
@@ -927,7 +1036,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       curve: Curves.easeInOut,
                       decoration: BoxDecoration(
                         color: Constants.secondaryLight,
-                        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                        borderRadius:
+                            BorderRadius.circular(AppConstants.radiusM),
                       ),
                       padding: EdgeInsets.all(AppConstants.spacingM),
                       child: Column(
@@ -954,7 +1064,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                                   ),
                                   IconButton(
-                                    onPressed: () => _loadCrimeReports(reset: true),
+                                    onPressed: () =>
+                                        _loadCrimeReports(reset: true),
                                     icon: Icon(
                                       Icons.refresh,
                                       color: Constants.primary,
@@ -981,18 +1092,22 @@ class _ProfilePageState extends State<ProfilePage> {
                                   physics: NeverScrollableScrollPhysics(),
                                   itemCount: crimeReports.length,
                                   itemBuilder: (context, idx) {
-                                    return _buildCrimeReportCard(crimeReports[idx], idx);
+                                    return _buildCrimeReportCard(
+                                        crimeReports[idx], idx);
                                   },
                                 ),
                                 if (currentPage < totalPages)
                                   Padding(
-                                    padding: EdgeInsets.only(top: AppConstants.spacingM),
+                                    padding: EdgeInsets.only(
+                                        top: AppConstants.spacingM),
                                     child: ElevatedButton(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Constants.primary,
                                         foregroundColor: Constants.white,
                                       ),
-                                      onPressed: isLoadingReports ? null : _loadMoreReports,
+                                      onPressed: isLoadingReports
+                                          ? null
+                                          : _loadMoreReports,
                                       child: isLoadingReports
                                           ? SizedBox(
                                               height: 20,
