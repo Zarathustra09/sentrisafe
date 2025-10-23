@@ -965,6 +965,81 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  Future<String?> _getAddressFromCoordinates(LatLng coordinates) async {
+    try {
+      final url = 'https://maps.googleapis.com/maps/api/geocode/json?'
+          'latlng=${coordinates.latitude},${coordinates.longitude}&'
+          'key=$apiKey';
+
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['results'] != null && data['results'].isNotEmpty) {
+          return data['results'][0]['formatted_address'];
+        }
+      }
+    } catch (e) {
+      print('Error getting address from coordinates: $e');
+    }
+    return null;
+  }
+
+  Future<void> _useCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        Position position = await Geolocator.getCurrentPosition();
+        final currentPos = LatLng(position.latitude, position.longitude);
+        final clampedPos = _clampToTanauan(currentPos);
+
+        // Get readable address
+        final address = await _getAddressFromCoordinates(clampedPos);
+
+        setState(() {
+          _currentLocation = clampedPos;
+          _fromController.text = address ??
+              'Current Location (${clampedPos.latitude.toStringAsFixed(4)}, ${clampedPos.longitude.toStringAsFixed(4)})';
+        });
+
+        // Move map to current location
+        if (_mapController != null) {
+          _mapController!.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(target: clampedPos, zoom: 16.0),
+            ),
+          );
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Current location set as starting point'),
+            backgroundColor: Constants.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission denied'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error using current location: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error getting current location: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   List<LatLng> _decodePolyline(String polyline) {
     List<LatLng> points = [];
     int index = 0, len = polyline.length;
@@ -1162,10 +1237,36 @@ class _MapPageState extends State<MapPage> {
             padding: const EdgeInsets.all(AppConstants.spacingM),
             child: Column(
               children: [
-                _buildPlaceTypeAhead(
-                  controller: _fromController,
-                  labelText: "From",
-                  prefixIcon: Icons.my_location,
+                // From field with current location button
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildPlaceTypeAhead(
+                        controller: _fromController,
+                        labelText: "From",
+                        prefixIcon: Icons.my_location,
+                      ),
+                    ),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Container(
+                      height: 56, // Match TextField height
+                      child: ElevatedButton(
+                        onPressed: _useCurrentLocation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Constants.accent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: Icon(
+                          Icons.gps_fixed,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppConstants.spacingS),
                 _buildPlaceTypeAhead(
