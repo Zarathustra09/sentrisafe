@@ -113,6 +113,22 @@ final emaildValidator = MultiValidator([
   EmailValidator(errorText: "Enter a valid email address"),
 ]);
 
-const String baseUrl = 'https://sentrisafe.net/api';
-const String storageUrl = 'https://sentrisafe.net/storage';
+const String baseUrl = 'http://172.16.0.188/api';
+const String storageUrl = 'http://172.16.0.188/storage';
 const String googleApiKey = 'AIzaSyDXaFeKPaKXgpFPp0IGlJuviW2RZCM9OtU';
+
+// Tanauan City, Batangas, Philippines map constants
+class MapConstants {
+  // Center of Tanauan
+  static const double tanauanCenterLat = 14.0836;
+  static const double tanauanCenterLng = 121.1496;
+
+  // Approximate bounding box of Tanauan City
+  static const double tanauanSouth = 14.0300;
+  static const double tanauanWest = 121.0900;
+  static const double tanauanNorth = 14.1400;
+  static const double tanauanEast = 121.2100;
+
+  // Places API location bias rectangle string
+  static const String tanauanLocationBiasRect = 'rectangle:14.03,121.09|14.14,121.21';
+}

@@ -136,9 +136,28 @@ class _MapPageState extends State<MapPage> {
 
   static const String apiKey = googleApiKey;
 
+  // Tanauan helpers
+  LatLng get _tanauanCenter =>
+      LatLng(MapConstants.tanauanCenterLat, MapConstants.tanauanCenterLng);
+  LatLngBounds get _tanauanBounds => LatLngBounds(
+        southwest: LatLng(MapConstants.tanauanSouth, MapConstants.tanauanWest),
+        northeast: LatLng(MapConstants.tanauanNorth, MapConstants.tanauanEast),
+      );
+  LatLng _clampToTanauan(LatLng p) {
+    final lat = p.latitude
+        .clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth)
+        .toDouble();
+    final lng = p.longitude
+        .clamp(MapConstants.tanauanWest, MapConstants.tanauanEast)
+        .toDouble();
+    return LatLng(lat, lng);
+  }
+
   @override
   void initState() {
     super.initState();
+    // Center map in Tanauan City by default
+    _currentLocation = _tanauanCenter;
     _getCurrentLocation();
     _loadCrimeReports();
   }
@@ -341,8 +360,11 @@ class _MapPageState extends State<MapPage> {
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition();
+        final clamped = _clampToTanauan(
+          LatLng(position.latitude, position.longitude),
+        );
         setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
+          _currentLocation = clamped;
         });
       }
     } catch (e) {
@@ -353,9 +375,12 @@ class _MapPageState extends State<MapPage> {
   Future<List<PlaceSuggestion>> _getPlaceSuggestions(String query) async {
     if (query.isEmpty) return [];
 
-    final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
+    final String url =
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
         'input=${Uri.encodeComponent(query)}&'
         'key=$apiKey&'
+        'components=country:ph&'
+        'locationbias=${Uri.encodeComponent(MapConstants.tanauanLocationBiasRect)}&'
         'types=geocode|establishment';
 
     try {
@@ -403,9 +428,28 @@ class _MapPageState extends State<MapPage> {
 
   Future<LatLng?> _getCoordinatesFromText(String text) async {
     try {
-      List<Location> locations = await locationFromAddress(text);
-      if (locations.isNotEmpty) {
-        return LatLng(locations.first.latitude, locations.first.longitude);
+      // Prefer Google Geocoding API restricted/bounded to Tanauan
+      final url =
+          'https://maps.googleapis.com/maps/api/geocode/json?'
+          'address=${Uri.encodeComponent('$text, Tanauan, Batangas, Philippines')}&'
+          'key=$apiKey&'
+          'components=country:PH&'
+          'bounds=${MapConstants.tanauanSouth},${MapConstants.tanauanWest}|'
+          '${MapConstants.tanauanNorth},${MapConstants.tanauanEast}';
+
+      final resp = await http.get(Uri.parse(url));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data['results'] != null &&
+            data['results'] is List &&
+            data['results'].isNotEmpty) {
+          final loc = data['results'][0]['geometry']['location'];
+          final latLng = LatLng(
+            (loc['lat'] as num).toDouble(),
+            (loc['lng'] as num).toDouble(),
+          );
+          return _clampToTanauan(latLng);
+        }
       }
     } catch (e) {
       print('Error geocoding address: $e');
@@ -961,25 +1005,38 @@ class _MapPageState extends State<MapPage> {
       double latPadding = (maxLat - minLat) * 0.1;
       double lngPadding = (maxLng - minLng) * 0.1;
 
+      // Clamp to Tanauan bounds
+      double south = (minLat - latPadding)
+          .clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth)
+          .toDouble();
+      double north = (maxLat + latPadding)
+          .clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth)
+          .toDouble();
+      double west = (minLng - lngPadding)
+          .clamp(MapConstants.tanauanWest, MapConstants.tanauanEast)
+          .toDouble();
+      double east = (maxLng + lngPadding)
+          .clamp(MapConstants.tanauanWest, MapConstants.tanauanEast)
+          .toDouble();
+
       try {
+        if (south >= north || west >= east) {
+          throw Exception('Invalid bounds after clamping');
+        }
         _mapController!.animateCamera(
           CameraUpdate.newLatLngBounds(
             LatLngBounds(
-              southwest: LatLng(minLat - latPadding, minLng - lngPadding),
-              northeast: LatLng(maxLat + latPadding, maxLng + lngPadding),
+              southwest: LatLng(south, west),
+              northeast: LatLng(north, east),
             ),
             100.0,
           ),
         );
       } catch (e) {
         print('Error fitting map to route: $e');
-        LatLng center = LatLng(
-          (from.latitude + to.latitude) / 2,
-          (from.longitude + to.longitude) / 2,
-        );
         _mapController!.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: center, zoom: 12.0),
+            CameraPosition(target: _tanauanCenter, zoom: 13.0),
           ),
         );
       }
@@ -1305,18 +1362,19 @@ class _MapPageState extends State<MapPage> {
           Expanded(
             child: _currentLocation != null
                 ? GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _currentLocation!,
-                zoom: 14.0,
-              ),
-              onMapCreated: (GoogleMapController controller) {
-                _mapController = controller;
-              },
-              markers: _markers,
-              polylines: _polylines,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-            )
+                    initialCameraPosition: CameraPosition(
+                      target: _currentLocation!,
+                      zoom: 14.0,
+                    ),
+                    onMapCreated: (GoogleMapController controller) {
+                      _mapController = controller;
+                    },
+                    cameraTargetBounds: CameraTargetBounds(_tanauanBounds),
+                    markers: _markers,
+                    polylines: _polylines,
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                  )
                 : const Center(child: CircularProgressIndicator()),
           ),
         ],
@@ -1324,3 +1382,4 @@ class _MapPageState extends State<MapPage> {
     );
   }
 }
+

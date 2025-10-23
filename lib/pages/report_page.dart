@@ -19,6 +19,23 @@ class _ReportPageState extends State<ReportPage> {
   LatLng? _currentLocation;
   Set<Marker> _markers = {};
 
+  // Tanauan helpers
+  LatLng get _tanauanCenter =>
+      LatLng(MapConstants.tanauanCenterLat, MapConstants.tanauanCenterLng);
+  LatLngBounds get _tanauanBounds => LatLngBounds(
+        southwest: LatLng(MapConstants.tanauanSouth, MapConstants.tanauanWest),
+        northeast: LatLng(MapConstants.tanauanNorth, MapConstants.tanauanEast),
+      );
+  LatLng _clampToTanauan(LatLng p) {
+    final lat = p.latitude
+        .clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth)
+        .toDouble();
+    final lng = p.longitude
+        .clamp(MapConstants.tanauanWest, MapConstants.tanauanEast)
+        .toDouble();
+    return LatLng(lat, lng);
+  }
+
   List<CrimeReport> _crimeReports = [];
   bool _isLoadingReports = false;
   bool _showCrimeReports = true;
@@ -32,6 +49,8 @@ class _ReportPageState extends State<ReportPage> {
   @override
   void initState() {
     super.initState();
+    // Center map in Tanauan City by default
+    _currentLocation = _tanauanCenter;
     _getCurrentLocation();
     _loadCrimeReports();
   }
@@ -53,7 +72,9 @@ class _ReportPageState extends State<ReportPage> {
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition();
         setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
+          _currentLocation = _clampToTanauan(
+            LatLng(position.latitude, position.longitude),
+          );
         });
       }
     } catch (e) {
@@ -139,7 +160,6 @@ class _ReportPageState extends State<ReportPage> {
       _markers = newMarkers;
     });
 
-    // Animate camera to fit markers when they change (supports search results)
     if (_mapController != null && newMarkers.isNotEmpty) {
       try {
         final positions = newMarkers.map((m) => m.position).toList();
@@ -157,18 +177,24 @@ class _ReportPageState extends State<ReportPage> {
           east = east + delta;
         }
 
+        // Clamp to Tanauan bounds
+        south = south.clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth).toDouble();
+        north = north.clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth).toDouble();
+        west = west.clamp(MapConstants.tanauanWest, MapConstants.tanauanEast).toDouble();
+        east = east.clamp(MapConstants.tanauanWest, MapConstants.tanauanEast).toDouble();
+
         final bounds = LatLngBounds(
           southwest: LatLng(south, west),
           northeast: LatLng(north, east),
         );
 
-        // add some padding
         _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
       } catch (e) {
         // Fallback: move to first marker if bounds calculation/animation fails
         try {
           final first = newMarkers.first.position;
-          _mapController!.animateCamera(CameraUpdate.newLatLngZoom(first, 14.0));
+          _mapController!.animateCamera(
+              CameraUpdate.newLatLngZoom(_clampToTanauan(first), 14.0));
         } catch (_) {
           // ignore
         }
@@ -176,7 +202,9 @@ class _ReportPageState extends State<ReportPage> {
     } else if (_mapController != null && newMarkers.isEmpty && _currentLocation != null) {
       // If no markers (e.g., search returned nothing), reset to user's location
       try {
-        _mapController!.animateCamera(CameraUpdate.newLatLngZoom(_currentLocation!, 12.0));
+        _mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(_tanauanCenter, 12.0),
+        );
       } catch (_) {
         // ignore
       }
@@ -528,6 +556,7 @@ class _ReportPageState extends State<ReportPage> {
                     onMapCreated: (GoogleMapController controller) {
                       _mapController = controller;
                     },
+                    cameraTargetBounds: CameraTargetBounds(_tanauanBounds),
                     markers: _markers,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: true,
