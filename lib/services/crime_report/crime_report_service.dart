@@ -142,12 +142,26 @@ class CrimeReportService {
         }
       } else {
         print('ERROR: Server returned error status');
-        print('Error data: ${data['errors']}');
 
-        return {
-          'success': false,
-          'errors': data['errors'] ?? {'general': 'Failed to submit report'},
-        };
+        // Handle different error response structures
+        Map<String, dynamic> errorResponse;
+        if (data is Map && data['message'] != null) {
+          // Single message format (like HTTP 422 validation errors)
+          print('Error message from server: ${data['message']}');
+          errorResponse = {'errors': {'general': data['message'].toString()}};
+        } else if (data is Map && data['errors'] != null) {
+          // Structured errors format
+          errorResponse = {'errors': Map<String, dynamic>.from(data['errors'])};
+        } else if (data is Map && data['error'] != null) {
+          // Single error format
+          errorResponse = {'errors': {'general': data['error'].toString()}};
+        } else {
+          // Fallback
+          errorResponse = {'errors': {'general': 'Failed to submit report'}};
+        }
+
+        print('Error data resolved to: ${errorResponse['errors']}');
+        return {'success': false, ...errorResponse};
       }
     } catch (e) {
       if (e is SocketException) {
