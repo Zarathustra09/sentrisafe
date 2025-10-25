@@ -47,6 +47,11 @@ class SaferRouteResponse {
   final CrimeAnalysis crimeAnalysis;
   final List<dynamic> alternativeRoutes;
   final String apiUsed;
+  // Add new fields for unsafe route scenarios
+  final String? message;
+  final double? bestAvailableScore;
+  final double? safetyThreshold;
+  final String? recommendation;
 
   SaferRouteResponse({
     required this.success,
@@ -58,19 +63,31 @@ class SaferRouteResponse {
     required this.crimeAnalysis,
     required this.alternativeRoutes,
     required this.apiUsed,
+    this.message,
+    this.bestAvailableScore,
+    this.safetyThreshold,
+    this.recommendation,
   });
 
   factory SaferRouteResponse.fromJson(Map<String, dynamic> json) {
+    // Handle route data from both success and unsafe route scenarios
+    final routeData = json['route_data'] as Map<String, dynamic>? ?? json;
+
     return SaferRouteResponse(
       success: json['success'] ?? false,
-      polyline: json['polyline'] ?? '',
-      safetyScore: (json['safety_score'] as num?)?.toDouble() ?? 0.0,
-      routeDescription: json['route_description'] ?? '',
-      duration: json['duration'] ?? '',
-      distance: json['distance'] ?? '',
+      polyline: routeData['polyline'] ?? '',
+      safetyScore: (json['best_available_score'] as num?)?.toDouble() ??
+                   (routeData['safety_score'] as num?)?.toDouble() ?? 0.0,
+      routeDescription: routeData['description'] ?? routeData['route_description'] ?? '',
+      duration: routeData['duration'] ?? '',
+      distance: routeData['distance'] ?? '',
       crimeAnalysis: CrimeAnalysis.fromJson(json['crime_analysis'] ?? {}),
       alternativeRoutes: json['alternative_routes'] ?? [],
       apiUsed: json['api_used'] ?? '',
+      message: json['message'],
+      bestAvailableScore: (json['best_available_score'] as num?)?.toDouble(),
+      safetyThreshold: (json['safety_threshold'] as num?)?.toDouble(),
+      recommendation: json['recommendation'],
     );
   }
 }
@@ -190,6 +207,8 @@ class _MapPageState extends State<MapPage> {
   // Add method to get marker color based on severity
   BitmapDescriptor _getCrimeMarkerIcon(String severity) {
     switch (severity.toLowerCase()) {
+      case 'critical':
+        return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
       case 'high':
         return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
       case 'medium':
@@ -335,6 +354,8 @@ class _MapPageState extends State<MapPage> {
 
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
+      case 'critical':
+        return Colors.purple;
       case 'high':
         return Constants.error;
       case 'medium':
@@ -545,10 +566,10 @@ class _MapPageState extends State<MapPage> {
     final String url = '$baseUrl/safer-route';
 
     final Map<String, dynamic> requestBody = {
-      "start_lat": from.latitude.toString(),
-      "start_lng": from.longitude.toString(),
-      "end_lat": to.latitude.toString(),
-      "end_lng": to.longitude.toString(),
+      "start_lat": from.latitude,
+      "start_lng": from.longitude,
+      "end_lat": to.latitude,
+      "end_lng": to.longitude,
       "radius": 5,
       "avoid_recent_crimes": true,
       "time_sensitivity_days": 30
@@ -596,22 +617,44 @@ class _MapPageState extends State<MapPage> {
           _fitMapToRoute(from, to);
           _showSaferRouteInfo(saferRouteResponse);
           print('Safer route map updated successfully');
+        } else if (!saferRouteResponse.success && saferRouteResponse.polyline.isNotEmpty) {
+          // Handle unsafe route scenario - still show the route but with warning
+          print('Route found but exceeds safety threshold');
+
+          setState(() {
+            _currentSaferRoute = saferRouteResponse;
+            _isCurrentRouteSafer = true;
+            _currentFromLocation = from;
+            _currentToLocation = to;
+            _currentPolyline = saferRouteResponse.polyline;
+            _currentDuration = saferRouteResponse.duration;
+            _currentDistance = saferRouteResponse.distance;
+
+            _polylines = {
+              Polyline(
+                polylineId: const PolylineId('unsafe_route'),
+                points: _decodePolyline(saferRouteResponse.polyline),
+                color: Constants.warning, // Use warning color for unsafe routes
+                width: 4,
+              ),
+            };
+          });
+
+          _updateMapMarkers();
+          _fitMapToRoute(from, to);
+          _showUnsafeRouteWarning(saferRouteResponse);
+          print('Unsafe route displayed with warning');
         } else {
-          print('No safer route found');
+          print('No route found');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No safer route found')),
+            const SnackBar(content: Text('No route found')),
           );
         }
-      } else if (response.statusCode == 404) {
-        // Handle 404 with message from response
-        String message = 'No safer route found';
-        try {
-          final data = json.decode(response.body);
-          if (data is Map && data['message'] != null) {
-            message = data['message'];
-          }
-        } catch (_) {}
-        print('HTTP 404: $message');
+      } else if (response.statusCode == 422) {
+        // Handle validation errors
+        final data = json.decode(response.body);
+        String message = data['message'] ?? 'Invalid request parameters';
+        print('Validation error: $message');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
@@ -703,6 +746,139 @@ class _MapPageState extends State<MapPage> {
                       style: TextStyle(
                         fontSize: 14,
                         color: Constants.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingM),
+              ],
+              Container(
+                padding: const EdgeInsets.all(AppConstants.spacingM),
+                decoration: BoxDecoration(
+                  color: Constants.background,
+                  borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Crime Analysis',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Constants.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppConstants.spacingS),
+                    Text(
+                      'Total crimes in area: ${saferRoute.crimeAnalysis.totalCrimesInArea}',
+                      style: TextStyle(color: Constants.textSecondary),
+                    ),
+                    Text(
+                      'Crimes near route: ${saferRoute.crimeAnalysis.crimesNearRoute}',
+                      style: TextStyle(color: Constants.textSecondary),
+                    ),
+                    Text(
+                      'High severity crimes: ${saferRoute.crimeAnalysis.highSeverityCrimes}',
+                      style: TextStyle(color: Constants.error),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showUnsafeRouteWarning(SaferRouteResponse saferRoute) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Constants.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppConstants.radiusL)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(AppConstants.spacingL),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.warning, color: Constants.error, size: 24),
+                  const SizedBox(width: AppConstants.spacingS),
+                  Expanded(
+                    child: Text(
+                      'Route Safety Warning',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Constants.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.spacingM),
+              if (saferRoute.message != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(AppConstants.spacingM),
+                  decoration: BoxDecoration(
+                    color: Constants.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                    border: Border.all(color: Constants.error.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    saferRoute.message!,
+                    style: TextStyle(
+                      color: Constants.error,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppConstants.spacingM),
+              ],
+              if (saferRoute.recommendation != null) ...[
+                Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline, color: Constants.warning, size: 20),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Expanded(
+                      child: Text(
+                        'Recommendation:',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Constants.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppConstants.spacingS),
+                Text(
+                  saferRoute.recommendation!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Constants.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppConstants.spacingM),
+              ],
+              if (saferRoute.bestAvailableScore != null && saferRoute.safetyThreshold != null) ...[
+                Row(
+                  children: [
+                    Icon(Icons.bar_chart, color: Constants.warning, size: 20),
+                    const SizedBox(width: AppConstants.spacingS),
+                    Text(
+                      'Safety Score: ${saferRoute.bestAvailableScore!.toStringAsFixed(1)}/${saferRoute.safetyThreshold!.toStringAsFixed(1)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Constants.textPrimary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -1450,6 +1626,7 @@ class _MapPageState extends State<MapPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
+                        _buildLegendItem('Critical', Colors.purple),
                         _buildLegendItem('High', Colors.red),
                         _buildLegendItem('Medium', Colors.orange),
                         _buildLegendItem('Low', Colors.yellow),

@@ -194,39 +194,66 @@ class CrimeReportService {
         return {'success': false, 'error': 'Authentication required'};
       }
 
-      final response = await http.get(
-        Uri.parse('$baseUrl/crime-reports'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      );
+      List<CrimeReport> allReports = [];
+      int currentPage = 1;
+      int? lastPage;
 
-      print('Get reports status code: ${response.statusCode}');
-      print('Get reports response: ${response.body}');
+      // Fetch all pages
+      do {
+        print('Fetching page $currentPage...');
 
-      final data = jsonDecode(response.body);
-      print('Get reports decoded data: $data');
+        final response = await http.get(
+          Uri.parse('$baseUrl/crime-reports?page=$currentPage'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        );
 
-      if (response.statusCode == 200) {
+        print('Page $currentPage status code: ${response.statusCode}');
+
+        if (response.statusCode != 200) {
+          print('ERROR: Failed to fetch page $currentPage with status ${response.statusCode}');
+          if (currentPage == 1) {
+            // If first page fails, return error
+            final data = jsonDecode(response.body);
+            return {'success': false, 'error': data['error'] ?? 'Failed to load reports'};
+          } else {
+            // If subsequent page fails, break and return what we have
+            print('Stopping pagination at page $currentPage due to error');
+            break;
+          }
+        }
+
+        final data = jsonDecode(response.body);
+
+        // Set last page from first response
+        if (lastPage == null) {
+          lastPage = data['last_page'] ?? 1;
+          print('Total pages to fetch: $lastPage');
+        }
+
         try {
-          List<CrimeReport> reports = (data['data'] as List)
+          List<CrimeReport> pageReports = (data['data'] as List)
               .map((report) {
-                print('Processing report data: $report');
                 return CrimeReport.fromJson(report);
               })
               .toList();
 
-          print('Successfully parsed ${reports.length} reports');
-          return {'success': true, 'reports': reports};
+          allReports.addAll(pageReports);
+          print('Page $currentPage: Added ${pageReports.length} reports (Total: ${allReports.length})');
+
         } catch (e) {
-          print('ERROR parsing reports list: $e');
-          return {'success': false, 'error': 'Error parsing reports: $e'};
+          print('ERROR parsing reports on page $currentPage: $e');
+          // Continue to next page instead of failing completely
         }
-      } else {
-        print('ERROR: Get reports failed with status ${response.statusCode}');
-        return {'success': false, 'error': data['error'] ?? 'Failed to load reports'};
-      }
+
+        currentPage++;
+      } while (currentPage <= (lastPage ?? 1));
+
+      print('Successfully loaded ${allReports.length} reports from ${currentPage - 1} pages');
+      return {'success': true, 'reports': allReports};
+
     } catch (e) {
       if (e is SocketException) {
         return {'success': false, 'error': 'No internet connection'};
