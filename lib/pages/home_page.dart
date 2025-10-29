@@ -30,6 +30,7 @@ class _HomePageState extends State<HomePage> {
   File? _selectedImage;
   bool _isSubmitting = false;
   bool _isLoadingLocation = false;
+  List<String> _selectedCrimes = []; // Changed to list for multiple crimes
 
   final ImagePicker _picker = ImagePicker();
 
@@ -137,47 +138,107 @@ class _HomePageState extends State<HomePage> {
   Future<void> _submitReport() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Validate that crime types have been selected
+    if (_selectedCrimes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please select at least one crime type'),
+          backgroundColor: Constants.error,
+        ),
+      );
+      return;
+    }
+
+    // Validate location coordinates
+    if (_latitudeController.text.isEmpty || _longitudeController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please set location coordinates before submitting'),
+          backgroundColor: Constants.error,
+        ),
+      );
+      return;
+    }
+
+    double? lat = double.tryParse(_latitudeController.text);
+    double? lng = double.tryParse(_longitudeController.text);
+
+    if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enter valid location coordinates'),
+          backgroundColor: Constants.error,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
 
     try {
-      final result = await CrimeReportService.submitReport(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null // Pass null if description is empty
-            : _descriptionController.text.trim(),
-        severity: _selectedSeverity,
-        latitude: double.parse(_latitudeController.text.trim()),
-        longitude: double.parse(_longitudeController.text.trim()),
-        address: _addressController.text.trim().isEmpty
-            ? null
-            : _addressController.text.trim(),
-        incidentDate: _selectedDate,
-        reportImage: _selectedImage,
-      );
+      // Submit a report for each selected crime
+      List<String> successfulSubmissions = [];
+      List<String> failedSubmissions = [];
 
-      if (result['success']) {
+      for (String crimeType in _selectedCrimes) {
+        try {
+          final result = await CrimeReportService.submitReport(
+            title: crimeType, // Use the crime type as title
+            description: _descriptionController.text.trim().isEmpty
+                ? null
+                : _descriptionController.text.trim(),
+            severity: _selectedSeverity,
+            latitude: lat,
+            longitude: lng,
+            address: _addressController.text.trim().isEmpty
+                ? null
+                : _addressController.text.trim(),
+            incidentDate: _selectedDate,
+            reportImage: _selectedImage,
+          );
+
+          if (result['success']) {
+            successfulSubmissions.add(crimeType);
+          } else {
+            failedSubmissions.add(crimeType);
+          }
+        } catch (e) {
+          failedSubmissions.add(crimeType);
+        }
+      }
+
+      // Show results
+      if (successfulSubmissions.isNotEmpty && failedSubmissions.isEmpty) {
+        // All successful
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Report submitted successfully'),
+            content: Text('All ${successfulSubmissions.length} reports submitted successfully'),
             backgroundColor: Constants.success,
-            duration: Duration(seconds: 2),
+            duration: Duration(seconds: 3),
           ),
         );
         _resetForm();
         setState(() {
           _showReportForm = false;
         });
-      } else {
-        String errorMessage = 'Failed to submit report';
-        if (result['errors'] is Map) {
-          errorMessage = result['errors'].values.first.toString();
-        }
+      } else if (successfulSubmissions.isNotEmpty && failedSubmissions.isNotEmpty) {
+        // Partial success
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text('${successfulSubmissions.length} reports submitted successfully, ${failedSubmissions.length} failed'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      } else {
+        // All failed
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit all reports. Please try again.'),
             backgroundColor: Constants.error,
+            duration: Duration(seconds: 3),
           ),
         );
       }
@@ -205,6 +266,7 @@ class _HomePageState extends State<HomePage> {
       _selectedSeverity = 'low';
       _selectedDate = DateTime.now();
       _selectedImage = null;
+      _selectedCrimes.clear(); // Clear selected crimes
     });
   }
 
@@ -785,12 +847,23 @@ class _HomePageState extends State<HomePage> {
     await showDialog(
       context: context,
       builder: (context) => CrimeSelectionModal(
-        selectedCrime: _titleController.text.isEmpty ? null : _titleController.text,
-        onCrimeSelected: (selectedCrime) {
+        selectedCrime: _selectedCrimes.isNotEmpty ? _selectedCrimes.first : null,
+        onCrimesSelected: (selectedCrimes) { // Changed callback
           setState(() {
-            _titleController.text = selectedCrime;
+            _selectedCrimes = selectedCrimes;
+            // Update title controller to show first crime or count
+            if (selectedCrimes.isNotEmpty) {
+              if (selectedCrimes.length == 1) {
+                _titleController.text = selectedCrimes.first;
+              } else {
+                _titleController.text = '${selectedCrimes.length} crime types selected';
+              }
+            } else {
+              _titleController.text = '';
+            }
           });
         },
+        selectedSeverity: _selectedSeverity,
       ),
     );
   }
@@ -835,7 +908,7 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Crime Type Selection - Replace dropdown with modal trigger
+                  // Crime Type Selection - Updated for multiple selection
                   GestureDetector(
                     onTap: _showCrimeSelectionModal,
                     child: Container(
@@ -845,13 +918,13 @@ class _HomePageState extends State<HomePage> {
                       ),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _titleController.text.isEmpty
+                          color: _selectedCrimes.isEmpty
                               ? Constants.greyDark
                               : Constants.primary,
-                          width: _titleController.text.isEmpty ? 1 : 2,
+                          width: _selectedCrimes.isEmpty ? 1 : 2,
                         ),
                         borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                        color: _titleController.text.isEmpty
+                        color: _selectedCrimes.isEmpty
                             ? Constants.background
                             : Constants.primary.withOpacity(0.05),
                       ),
@@ -859,7 +932,7 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Icon(
                             Icons.report_problem,
-                            color: _titleController.text.isEmpty
+                            color: _selectedCrimes.isEmpty
                                 ? Constants.textSecondary
                                 : Constants.primary,
                           ),
@@ -869,7 +942,7 @@ class _HomePageState extends State<HomePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Incident Title *',
+                                  'Crime Types *',
                                   style: TextStyle(
                                     color: Constants.textSecondary,
                                     fontSize: 12,
@@ -878,21 +951,71 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _titleController.text.isEmpty
-                                      ? 'Tap to select crime type'
-                                      : _titleController.text,
+                                  _selectedCrimes.isEmpty
+                                      ? 'Tap to select crime types'
+                                      : _selectedCrimes.length == 1
+                                          ? _selectedCrimes.first
+                                          : '${_selectedCrimes.length} crime types selected',
                                   style: TextStyle(
-                                    color: _titleController.text.isEmpty
+                                    color: _selectedCrimes.isEmpty
                                         ? Constants.textSecondary
                                         : Constants.textPrimary,
                                     fontSize: 16,
-                                    fontWeight: _titleController.text.isEmpty
+                                    fontWeight: _selectedCrimes.isEmpty
                                         ? FontWeight.normal
                                         : FontWeight.w500,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                // Show selected crimes list
+                                if (_selectedCrimes.length > 1) ...[
+                                  const SizedBox(height: AppConstants.spacingS),
+                                  Wrap(
+                                    spacing: AppConstants.spacingXS,
+                                    runSpacing: AppConstants.spacingXS,
+                                    children: _selectedCrimes.take(3).map((crime) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppConstants.spacingS,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Constants.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                                        ),
+                                        child: Text(
+                                          crime.length > 20 ? '${crime.substring(0, 20)}...' : crime,
+                                          style: TextStyle(
+                                            color: Constants.primary,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList()
+                                      ..addAll(_selectedCrimes.length > 3 ? [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppConstants.spacingS,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Constants.primary.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                                          ),
+                                          child: Text(
+                                            '+${_selectedCrimes.length - 3} more',
+                                            style: TextStyle(
+                                              color: Constants.primary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ] : []),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -907,11 +1030,11 @@ class _HomePageState extends State<HomePage> {
                   ),
 
                   // Add validation helper text
-                  if (_titleController.text.isEmpty)
+                  if (_selectedCrimes.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(left: 12, top: 4),
                       child: Text(
-                        'Please select a crime type to continue',
+                        'Please select at least one crime type to continue',
                         style: TextStyle(
                           color: Constants.textSecondary,
                           fontSize: 12,
@@ -1192,24 +1315,12 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: AppConstants.spacingL),
-                  // Submit Button - Add validation for title
+                  // Submit Button - Updated for multiple reports
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : () {
-                        // Check if title is selected before validating form
-                        if (_titleController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Please select a crime type first'),
-                              backgroundColor: Constants.error,
-                            ),
-                          );
-                          return;
-                        }
-                        _submitReport();
-                      },
+                      onPressed: _isSubmitting ? null : _submitReport,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Constants.primary,
                         foregroundColor: Constants.white,
@@ -1220,9 +1331,25 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       child: _isSubmitting
-                          ? CircularProgressIndicator(color: Constants.white)
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Constants.white,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(width: AppConstants.spacingS),
+                                Text('Submitting ${_selectedCrimes.length} Report${_selectedCrimes.length == 1 ? '' : 's'}...'),
+                              ],
+                            )
                           : Text(
-                              'Submit Report',
+                              _selectedCrimes.length <= 1
+                                  ? 'Submit Report'
+                                  : 'Submit ${_selectedCrimes.length} Reports',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
