@@ -113,8 +113,8 @@ final emaildValidator = MultiValidator([
   EmailValidator(errorText: "Enter a valid email address"),
 ]);
 
-const String baseUrl = 'http://172.16.0.100/api';
-const String storageUrl = 'http://172.16.0.100/storage';
+const String baseUrl = 'https://sentrisafe.net/api';
+const String storageUrl = 'https://sentrisafe.net/storage';
 const String googleApiKey = 'AIzaSyDXaFeKPaKXgpFPp0IGlJuviW2RZCM9OtU';
 
 // Tanauan City, Batangas, Philippines map constants
