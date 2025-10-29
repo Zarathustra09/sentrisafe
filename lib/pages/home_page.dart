@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../constants.dart';
 import '../services/crime_report/crime_report_service.dart';
+import '../widgets/crime_selection_modal.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -372,59 +373,58 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(AppConstants.radiusM),
                     border: Border.all(color: Colors.orange, width: 2),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.bug_report,
-                            color: Colors.orange,
-                            size: 24,
-                          ),
-                          const SizedBox(width: AppConstants.spacingS),
-                          Expanded(
-                            child: Text(
-                              'TEST CARD - Tap to Test Call Feature',
-                              style: TextStyle(
-                                color: Colors.orange,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.phone_in_talk,
+                        color: Colors.red,
+                        size: 24,
                       ),
-                      const SizedBox(height: AppConstants.spacingS),
-                      InkWell(
-                        onTap: () =>
-                            _makePhoneCall('1234567890', 'Test Contact'),
-                        child: Container(
-                          padding: const EdgeInsets.all(AppConstants.spacingS),
-                          decoration: BoxDecoration(
-                            color: Constants.background,
-                            borderRadius: BorderRadius.circular(
-                              AppConstants.radiusS,
-                            ),
-                            border: Border.all(color: Colors.orange),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.phone, color: Colors.orange, size: 20),
-                              const SizedBox(width: AppConstants.spacingS),
-                              Expanded(
-                                child: Text(
-                                  'Tap here to test: 123-456-7890',
-                                  style: TextStyle(
-                                    color: Constants.textPrimary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
+                      const SizedBox(width: AppConstants.spacingS),
+                      Expanded(
+                        child: Text(
+                          'MAIN HOTLINE - Tap to call the hotline',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                      const SizedBox(height: AppConstants.spacingS),
+                     InkWell(
+                       onTap: () => _makePhoneCall('911', '911 Emergency Hotline'),
+                       child: Container(
+                         padding: const EdgeInsets.all(AppConstants.spacingS),
+                         decoration: BoxDecoration(
+                           color: Constants.background,
+                           borderRadius: BorderRadius.circular(
+                             AppConstants.radiusS,
+                           ),
+                           border: Border.all(color: Colors.red),
+                         ),
+                         child: Row(
+                           children: [
+                             Icon(Icons.phone, color: Colors.red, size: 20),
+                             const SizedBox(width: AppConstants.spacingS),
+                             Expanded(
+                               child: Text(
+                                 'Call now: 911 (Main Hotline)',
+                                 style: TextStyle(
+                                   color: Constants.textPrimary,
+                                   fontWeight: FontWeight.w600,
+                                 ),
+                               ),
+                             ),
+                           ],
+                         ),
+                       ),
+                     ),
                       const SizedBox(height: AppConstants.spacingXS),
                       Text(
                         '✓ This will show the confirmation dialog',
@@ -781,6 +781,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _showCrimeSelectionModal() async {
+    await showDialog(
+      context: context,
+      builder: (context) => CrimeSelectionModal(
+        selectedCrime: _titleController.text.isEmpty ? null : _titleController.text,
+        onCrimeSelected: (selectedCrime) {
+          setState(() {
+            _titleController.text = selectedCrime;
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildReportForm() {
     return Container(
       padding: const EdgeInsets.all(AppConstants.spacingM),
@@ -821,101 +835,92 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title Field - Fixed Dropdown
-                  DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: _titleController.text.isNotEmpty
-                        ? _titleController.text
-                        : null,
-                    style: TextStyle(color: Constants.textPrimary),
-                    dropdownColor: Constants.surface,
-                    decoration: InputDecoration(
-                      labelText: 'Incident Title',
-                      labelStyle: TextStyle(color: Constants.textSecondary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusM,
-                        ),
-                        borderSide: BorderSide(color: Constants.greyDark),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusM,
-                        ),
-                        borderSide: BorderSide(color: Constants.greyDark),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusM,
-                        ),
-                        borderSide: BorderSide(color: Constants.primary),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
+                  // Crime Type Selection - Replace dropdown with modal trigger
+                  GestureDetector(
+                    onTap: _showCrimeSelectionModal,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
                         vertical: 16,
+                        horizontal: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: _titleController.text.isEmpty
+                              ? Constants.greyDark
+                              : Constants.primary,
+                          width: _titleController.text.isEmpty ? 1 : 2,
+                        ),
+                        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                        color: _titleController.text.isEmpty
+                            ? Constants.background
+                            : Constants.primary.withOpacity(0.05),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.report_problem,
+                            color: _titleController.text.isEmpty
+                                ? Constants.textSecondary
+                                : Constants.primary,
+                          ),
+                          const SizedBox(width: AppConstants.spacingM),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Incident Title *',
+                                  style: TextStyle(
+                                    color: Constants.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _titleController.text.isEmpty
+                                      ? 'Tap to select crime type'
+                                      : _titleController.text,
+                                  style: TextStyle(
+                                    color: _titleController.text.isEmpty
+                                        ? Constants.textSecondary
+                                        : Constants.textPrimary,
+                                    fontSize: 16,
+                                    fontWeight: _titleController.text.isEmpty
+                                        ? FontWeight.normal
+                                        : FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            color: Constants.textSecondary,
+                            size: 16,
+                          ),
+                        ],
                       ),
                     ),
-                    items:
-                        [
-                              'Illegal gambling (STL, jueteng)',
-                              'Illegal possession of firearms',
-                              'Drug-related offenses (shabu buy-busts)',
-                              'Robbery / Burglary (shops, houses)',
-                              'Snatching / street theft (often by motorcycle riders)',
-                              'Violent crimes (murder, shootings, assaults)',
-                              'Sexual offenses (rape, harassment)',
-                              'Murder / Homicide',
-                              'Physical injuries / Assault',
-                              'Rape / Sexual assault',
-                              'Robbery',
-                              'Theft / Snatching',
-                              'Burglary',
-                              'Carnapping',
-                              'Arson',
-                              'Illegal drugs (possession, trafficking, use)',
-                              'Illegal possession of firearms',
-                              'Illegal discharge of firearms',
-                              'Violence against women and children (VAWC)',
-                              'Child abuse / exploitation',
-                              'Human trafficking',
-                              'Estafa / Swindling',
-                              'Cybercrime (scams, hacking, phishing)',
-                              'Forgery / Falsification of documents',
-                              'Bribery / Corruption',
-                              'Illegal recruitment',
-                              'Illegal gambling',
-                              'Drunk and disorderly conduct',
-                              'Vandalism',
-                              'Public scandal / Grave threats / Grave coercion',
-                              'Trespassing',
-                              'Environmental crimes (illegal logging, quarrying, wildlife trade)',
-                              'Smuggling',
-                              'Curfew violations',
-                            ]
-                            .map(
-                              (value) => DropdownMenuItem(
-                                value: value,
-                                child: Text(
-                                  value,
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _titleController.text = value ?? '';
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Title is required';
-                      }
-                      return null;
-                    },
                   ),
+
+                  // Add validation helper text
+                  if (_titleController.text.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12, top: 4),
+                      child: Text(
+                        'Please select a crime type to continue',
+                        style: TextStyle(
+                          color: Constants.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+
                   const SizedBox(height: AppConstants.spacingM),
+
                   // Description Field - Made Optional
                   TextFormField(
                     controller: _descriptionController,
@@ -943,9 +948,9 @@ class _HomePageState extends State<HomePage> {
                         borderSide: BorderSide(color: Constants.primary),
                       ),
                     ),
-                    // Validator removed to make it optional
                   ),
                   const SizedBox(height: AppConstants.spacingM),
+
                   // Severity Dropdown
                   DropdownButtonFormField<String>(
                     value: _selectedSeverity,
@@ -1187,12 +1192,24 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: AppConstants.spacingL),
-                  // Submit Button
+                  // Submit Button - Add validation for title
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitReport,
+                      onPressed: _isSubmitting ? null : () {
+                        // Check if title is selected before validating form
+                        if (_titleController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Please select a crime type first'),
+                              backgroundColor: Constants.error,
+                            ),
+                          );
+                          return;
+                        }
+                        _submitReport();
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Constants.primary,
                         foregroundColor: Constants.white,
