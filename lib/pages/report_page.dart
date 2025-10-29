@@ -37,10 +37,12 @@ class _ReportPageState extends State<ReportPage> {
   }
 
   List<CrimeReport> _crimeReports = [];
+  List<CrimeReport> _allCrimeReports = []; // Store all reports for local filtering
   bool _isLoadingReports = false;
   bool _showCrimeReports = true;
   String? _selectedSeverity;
 
+  // Remove pagination variables
   final List<String> _severityOptions = ['All', 'High', 'Medium', 'Low'];
 
   // Search controller and state
@@ -82,32 +84,18 @@ class _ReportPageState extends State<ReportPage> {
     }
   }
 
-  Future<void> _loadCrimeReports({String? search}) async {
+  Future<void> _loadCrimeReports() async {
     setState(() {
       _isLoadingReports = true;
     });
 
     try {
-      // derive severity param (api expects severity values, skip 'All')
-      String? severityParam;
-      if (_selectedSeverity != null && _selectedSeverity != 'All') {
-        severityParam = _selectedSeverity;
-      }
-
-      // Include current location if available
-      double? lat = _currentLocation?.latitude;
-      double? lng = _currentLocation?.longitude;
-
-      final result = await CrimeReportService.getReportsWithFilters(
-        severity: severityParam,
-        lat: lat,
-        lng: lng,
-        search: search,
-      );
-
+      // Fetch all reports at once (same approach as map_page)
+      final result = await CrimeReportService.getReports();
       if (result['success'] == true) {
         setState(() {
-          _crimeReports = result['reports'] ?? [];
+          _allCrimeReports = result['reports'] ?? [];
+          _applyFilters(); // Apply current filters after loading
           _updateMapMarkers();
         });
       } else {
@@ -132,6 +120,35 @@ class _ReportPageState extends State<ReportPage> {
         _isLoadingReports = false;
       });
     }
+  }
+
+  // Add method to apply filters locally
+  void _applyFilters() {
+    List<CrimeReport> filteredReports = List.from(_allCrimeReports);
+
+    // Apply severity filter
+    if (_selectedSeverity != null && _selectedSeverity != 'All') {
+      filteredReports = filteredReports.where((report) =>
+          report.severity.toLowerCase() == _selectedSeverity!.toLowerCase()).toList();
+    }
+
+    // Apply search filter
+    final searchQuery = _searchController.text.trim().toLowerCase();
+    if (searchQuery.isNotEmpty) {
+      filteredReports = filteredReports.where((report) {
+        return report.title.toLowerCase().contains(searchQuery) ||
+            (report.description?.toLowerCase().contains(searchQuery) ?? false) ||
+            (report.address?.toLowerCase().contains(searchQuery) ?? false);
+      }).toList();
+    }
+
+    setState(() {
+      _crimeReports = filteredReports;
+    });
+  }
+
+  Future<void> _refreshReports() async {
+    await _loadCrimeReports();
   }
 
   void _updateMapMarkers() {
@@ -371,15 +388,18 @@ class _ReportPageState extends State<ReportPage> {
                       size: 24,
                     ),
                     const SizedBox(width: AppConstants.spacingS),
-                    Text(
-                      'AI Crime Map (${_crimeReports.length})',
-                      style: TextStyle(
-                        color: Constants.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        'AI Crime Map (${_crimeReports.length} total)',
+                        style: TextStyle(
+                          color: Constants.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: AppConstants.spacingS),
                     // Toggle switch for showing/hiding crime reports
                     Switch(
                       value: _showCrimeReports,
@@ -391,7 +411,6 @@ class _ReportPageState extends State<ReportPage> {
                       },
                       activeColor: Constants.primary,
                     ),
-                    const SizedBox(width: AppConstants.spacingS),
                     if (_isLoadingReports)
                       const SizedBox(
                         width: 20,
@@ -399,13 +418,19 @@ class _ReportPageState extends State<ReportPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     else
-                      IconButton(
-                        onPressed: () => _loadCrimeReports(search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim()),
-                        icon: Icon(
-                          Icons.refresh,
-                          color: Constants.primary,
+                      SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: IconButton(
+                          onPressed: _refreshReports,
+                          icon: Icon(
+                            Icons.refresh,
+                            color: Constants.primary,
+                            size: 20,
+                          ),
+                          tooltip: 'Refresh reports',
+                          padding: EdgeInsets.zero,
                         ),
-                        tooltip: 'Refresh reports',
                       ),
                   ],
                 ),
@@ -436,23 +461,24 @@ class _ReportPageState extends State<ReportPage> {
                                 onPressed: () {
                                   if (_searchController.text.isNotEmpty) {
                                     _searchController.clear();
-                                    _loadCrimeReports(); // refresh without search
+                                    _applyFilters();
+                                    _updateMapMarkers();
                                   }
                                 },
                               ),
                               IconButton(
                                 icon: Icon(Icons.search, color: Constants.primary),
                                 onPressed: () {
-                                  final q = _searchController.text.trim();
-                                  _loadCrimeReports(search: q.isEmpty ? null : q);
+                                  _applyFilters();
+                                  _updateMapMarkers();
                                 },
                               ),
                             ],
                           ),
                         ),
                         onSubmitted: (value) {
-                          final q = value.trim();
-                          _loadCrimeReports(search: q.isEmpty ? null : q);
+                          _applyFilters();
+                          _updateMapMarkers();
                         },
                       ),
                     ),
@@ -508,9 +534,8 @@ class _ReportPageState extends State<ReportPage> {
                         onChanged: (value) {
                           setState(() {
                             _selectedSeverity = value;
-                            // reload with current search if any
-                            final q = _searchController.text.trim();
-                            _loadCrimeReports(search: q.isEmpty ? null : q);
+                            _applyFilters();
+                            _updateMapMarkers();
                           });
                         },
                         hint: Text(
@@ -534,6 +559,7 @@ class _ReportPageState extends State<ReportPage> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
+                        _buildLegendItem('Critical', Colors.purple),
                         _buildLegendItem('High', Colors.red),
                         _buildLegendItem('Medium', Colors.orange),
                         _buildLegendItem('Low', Colors.yellow),
@@ -577,4 +603,3 @@ class _ReportPageState extends State<ReportPage> {
     );
   }
 }
-
