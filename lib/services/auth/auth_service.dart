@@ -563,6 +563,10 @@ class AuthService {
 
       if (response.statusCode == 200) {
         _log('Login successful');
+
+        // Debug: Print the entire user object
+        _log('User data: ${data['user']}');
+
         int userId = int.parse(data['user_id'].toString());
         String token = data['token'];
 
@@ -570,6 +574,39 @@ class AuthService {
         if (data['user'] != null && data['user']['is_verified'] == 0) {
           _log('User not verified');
           return {'success': false, 'error': 'User is not yet verified'};
+        }
+
+        // Check if user is restricted (check both int and bool values)
+        if (data['user'] != null) {
+          var isRestricted = data['user']['is_restricted'];
+          _log(
+              'is_restricted value: $isRestricted (type: ${isRestricted.runtimeType})');
+
+          if (isRestricted == 1 ||
+              isRestricted == true ||
+              isRestricted == '1') {
+            _log('User is restricted');
+            return {
+              'success': false,
+              'error':
+                  'Your account has been restricted. Please contact support for assistance.'
+            };
+          }
+        }
+
+        // Check if user is blocked (check both int and bool values)
+        if (data['user'] != null) {
+          var isBlocked = data['user']['is_blocked'];
+          _log('is_blocked value: $isBlocked (type: ${isBlocked.runtimeType})');
+
+          if (isBlocked == 1 || isBlocked == true || isBlocked == '1') {
+            _log('User is blocked');
+            return {
+              'success': false,
+              'error':
+                  'Your account has been blocked. Please contact support for more information.'
+            };
+          }
         }
 
         await _saveAuthData(token, userId);
