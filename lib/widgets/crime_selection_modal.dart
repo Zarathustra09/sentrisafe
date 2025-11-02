@@ -3,13 +3,13 @@ import '../constants.dart';
 
 class CrimeSelectionModal extends StatefulWidget {
   final String? selectedCrime;
-  final Function(List<String>) onCrimesSelected; // Changed to accept multiple crimes
+  final Function(List<Map<String, String>>) onCrimesSelected; // Now passes crime with severity
   final String selectedSeverity;
 
   const CrimeSelectionModal({
     Key? key,
     this.selectedCrime,
-    required this.onCrimesSelected, // Changed parameter name
+    required this.onCrimesSelected,
     required this.selectedSeverity,
   }) : super(key: key);
 
@@ -20,51 +20,58 @@ class CrimeSelectionModal extends StatefulWidget {
 class _CrimeSelectionModalState extends State<CrimeSelectionModal> {
   late TextEditingController _searchController;
   String _searchQuery = '';
-  Set<String> _selectedCrimes = {}; // Changed to Set for multiple selection
+  Set<String> _selectedCrimes = {};
 
-  // List of all crime types
-  final List<String> _crimeTypes = [
-    'Illegal gambling (STL, jueteng)',
-    'Illegal possession of firearms',
-    'Drug-related offenses (shabu buy-busts)',
-    'Robbery / Burglary (shops, houses)',
-    'Snatching / street theft (often by motorcycle riders)',
-    'Violent crimes (murder, shootings, assaults)',
-    'Sexual offenses (rape, harassment)',
-    'Murder / Homicide',
-    'Physical injuries / Assault',
-    'Rape / Sexual assault',
-    'Robbery',
-    'Theft / Snatching',
-    'Burglary',
-    'Carnapping',
-    'Arson',
-    'Illegal drugs (possession, trafficking, use)',
-    'Illegal possession of firearms',
-    'Illegal discharge of firearms',
-    'Violence against women and children (VAWC)',
-    'Child abuse / exploitation',
-    'Human trafficking',
-    'Estafa / Swindling',
-    'Cybercrime (scams, hacking, phishing)',
-    'Forgery / Falsification of documents',
-    'Bribery / Corruption',
-    'Illegal recruitment',
-    'Illegal gambling',
-    'Drunk and disorderly conduct',
-    'Vandalism',
-    'Public scandal / Grave threats / Grave coercion',
-    'Trespassing',
-    'Environmental crimes (illegal logging, quarrying, wildlife trade)',
-    'Smuggling',
-    'Curfew violations',
-  ];
+  // Map of crime types with their assigned severity
+  final Map<String, String> _crimeTypesWithSeverity = {
+    // Low Severity
+    'Curfew violations': 'low',
+    'Drunk and disorderly conduct': 'low',
+    'Vandalism': 'low',
+    'Public scandal / Grave threats / Grave coercion': 'low',
+    'Trespassing': 'low',
+
+    // Medium Severity
+    'Estafa / Swindling': 'medium',
+    'Cybercrime (scams, hacking, phishing)': 'medium',
+    'Forgery / Falsification of documents': 'medium',
+    'Bribery / Corruption': 'medium',
+    'Illegal recruitment': 'medium',
+    'Illegal gambling (STL, jueteng)': 'medium',
+    'Illegal gambling': 'medium',
+    'Environmental crimes (illegal logging, quarrying, wildlife trade)': 'medium',
+    'Smuggling': 'medium',
+
+    // High Severity
+    'Robbery / Burglary (shops, houses)': 'high',
+    'Robbery': 'high',
+    'Burglary': 'high',
+    'Theft / Snatching': 'high',
+    'Snatching / street theft (often by motorcycle riders)': 'high',
+    'Carnapping': 'high',
+    'Arson': 'high',
+    'Illegal possession of firearms': 'high',
+    'Illegal discharge of firearms': 'high',
+    'Drug-related offenses (shabu buy-busts)': 'high',
+    'Illegal drugs (possession, trafficking, use)': 'high',
+    'Physical injuries / Assault': 'high',
+    'Violent crimes (murder, shootings, assaults)': 'high',
+    'Child abuse / exploitation': 'high',
+    'Violence against women and children (VAWC)': 'high',
+
+    // Critical Severity
+    'Murder / Homicide': 'critical',
+    'Sexual offenses (rape, harassment)': 'critical',
+    'Rape / Sexual assault': 'critical',
+    'Human trafficking': 'critical',
+  };
 
   List<String> get _filteredCrimeTypes {
+    final crimes = _crimeTypesWithSeverity.keys.toList();
     if (_searchQuery.isEmpty) {
-      return _crimeTypes;
+      return crimes;
     }
-    return _crimeTypes
+    return crimes
         .where((crime) => crime.toLowerCase().contains(_searchQuery.toLowerCase()))
         .toList();
   }
@@ -74,7 +81,6 @@ class _CrimeSelectionModalState extends State<CrimeSelectionModal> {
     super.initState();
     _searchController = TextEditingController();
 
-    // Initialize with existing selected crime if any
     if (widget.selectedCrime != null && widget.selectedCrime!.isNotEmpty) {
       _selectedCrimes.add(widget.selectedCrime!);
     }
@@ -96,8 +102,36 @@ class _CrimeSelectionModalState extends State<CrimeSelectionModal> {
       );
       return;
     }
-    widget.onCrimesSelected(_selectedCrimes.toList());
+
+    // Create list of maps with crime and severity
+    List<Map<String, String>> crimesWithSeverity = _selectedCrimes.map((crime) {
+      return {
+        'crime': crime,
+        'severity': _crimeTypesWithSeverity[crime] ?? 'medium',
+      };
+    }).toList();
+
+    widget.onCrimesSelected(crimesWithSeverity);
     Navigator.of(context).pop();
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity) {
+      case 'low':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'high':
+        return Colors.deepOrange;
+      case 'critical':
+        return Constants.error;
+      default:
+        return Constants.textSecondary;
+    }
+  }
+
+  String _getSeverityLabel(String severity) {
+    return severity[0].toUpperCase() + severity.substring(1);
   }
 
   @override
@@ -158,7 +192,7 @@ class _CrimeSelectionModalState extends State<CrimeSelectionModal> {
                           ),
                         ),
                         Text(
-                          'Choose one or more crime types to report',
+                          'Each crime has a pre-assigned severity level',
                           style: TextStyle(
                             color: Constants.textSecondary,
                             fontSize: 14,
@@ -193,17 +227,17 @@ class _CrimeSelectionModalState extends State<CrimeSelectionModal> {
                   ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchQuery = '';
-                            });
-                          },
-                          icon: Icon(
-                            Icons.clear,
-                            color: Constants.textSecondary,
-                          ),
-                        )
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                    icon: Icon(
+                      Icons.clear,
+                      color: Constants.textSecondary,
+                    ),
+                  )
                       : null,
                   filled: true,
                   fillColor: Constants.background,
@@ -301,91 +335,120 @@ class _CrimeSelectionModalState extends State<CrimeSelectionModal> {
 
             const SizedBox(height: AppConstants.spacingS),
 
-            // Crime Types List (multiple selection with checkboxes)
+            // Crime Types List with severity badges
             Expanded(
               child: _filteredCrimeTypes.isEmpty
                   ? _buildNoResultsWidget()
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppConstants.spacingL,
-                      ),
-                      itemCount: _filteredCrimeTypes.length,
-                      itemBuilder: (context, index) {
-                        final crimeType = _filteredCrimeTypes[index];
-                        final isSelected = _selectedCrimes.contains(crimeType);
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppConstants.spacingL,
+                ),
+                itemCount: _filteredCrimeTypes.length,
+                itemBuilder: (context, index) {
+                  final crimeType = _filteredCrimeTypes[index];
+                  final isSelected = _selectedCrimes.contains(crimeType);
+                  final severity = _crimeTypesWithSeverity[crimeType] ?? 'medium';
+                  final severityColor = _getSeverityColor(severity);
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: AppConstants.spacingS),
-                          child: InkWell(
-                            onTap: () {
-                              setState(() {
-                                if (isSelected) {
-                                  _selectedCrimes.remove(crimeType);
-                                } else {
-                                  _selectedCrimes.add(crimeType);
-                                }
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                            child: Container(
-                              padding: const EdgeInsets.all(AppConstants.spacingM),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Constants.primary.withOpacity(0.1)
-                                    : Constants.background,
-                                borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Constants.primary
-                                      : Constants.greyDark,
-                                  width: isSelected ? 2 : 1,
-                                ),
-                              ),
-                              child: Row(
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: AppConstants.spacingS),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedCrimes.remove(crimeType);
+                          } else {
+                            _selectedCrimes.add(crimeType);
+                          }
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                      child: Container(
+                        padding: const EdgeInsets.all(AppConstants.spacingM),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Constants.primary.withOpacity(0.1)
+                              : Constants.background,
+                          borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                          border: Border.all(
+                            color: isSelected
+                                ? Constants.primary
+                                : Constants.greyDark,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: isSelected,
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  if (value == true) {
+                                    _selectedCrimes.add(crimeType);
+                                  } else {
+                                    _selectedCrimes.remove(crimeType);
+                                  }
+                                });
+                              },
+                              activeColor: Constants.primary,
+                            ),
+                            const SizedBox(width: AppConstants.spacingS),
+                            Icon(
+                              _getCrimeIcon(crimeType),
+                              color: isSelected
+                                  ? Constants.primary
+                                  : Constants.textSecondary,
+                              size: 24,
+                            ),
+                            const SizedBox(width: AppConstants.spacingM),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Checkbox(
-                                    value: isSelected,
-                                    onChanged: (bool? value) {
-                                      setState(() {
-                                        if (value == true) {
-                                          _selectedCrimes.add(crimeType);
-                                        } else {
-                                          _selectedCrimes.remove(crimeType);
-                                        }
-                                      });
-                                    },
-                                    activeColor: Constants.primary,
+                                  Text(
+                                    crimeType,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? Constants.primary
+                                          : Constants.textPrimary,
+                                      fontSize: 16,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
                                   ),
-                                  const SizedBox(width: AppConstants.spacingS),
-                                  Icon(
-                                    _getCrimeIcon(crimeType),
-                                    color: isSelected
-                                        ? Constants.primary
-                                        : Constants.textSecondary,
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: AppConstants.spacingM),
-                                  Expanded(
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: severityColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: severityColor.withOpacity(0.5),
+                                      ),
+                                    ),
                                     child: Text(
-                                      crimeType,
+                                      _getSeverityLabel(severity),
                                       style: TextStyle(
-                                        color: isSelected
-                                            ? Constants.primary
-                                            : Constants.textPrimary,
-                                        fontSize: 16,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
+                                        color: severityColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          ],
+                        ),
+                      ),
                     ),
+                  );
+                },
+              ),
             ),
 
             // Bottom section with select button

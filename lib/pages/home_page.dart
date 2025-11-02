@@ -25,12 +25,11 @@ class _HomePageState extends State<HomePage> {
   final _latitudeController = TextEditingController();
   final _longitudeController = TextEditingController();
 
-  String _selectedSeverity = 'low';
   DateTime _selectedDate = DateTime.now();
   File? _selectedImage;
   bool _isSubmitting = false;
   bool _isLoadingLocation = false;
-  List<String> _selectedCrimes = []; // Changed to list for multiple crimes
+  List<Map<String, String>> _selectedCrimesWithSeverity = []; // Now stores crime + severity
 
   final ImagePicker _picker = ImagePicker();
 
@@ -135,11 +134,30 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Color _getSeverityColor(String severity) {
+    switch (severity) {
+      case 'low':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'high':
+        return Colors.deepOrange;
+      case 'critical':
+        return Constants.error;
+      default:
+        return Constants.textSecondary;
+    }
+  }
+
+  String _getSeverityLabel(String severity) {
+    return severity[0].toUpperCase() + severity.substring(1);
+  }
+
   Future<void> _submitReport() async {
     if (!_formKey.currentState!.validate()) return;
 
     // Validate that crime types have been selected
-    if (_selectedCrimes.isEmpty) {
+    if (_selectedCrimesWithSeverity.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Please select at least one crime type'),
@@ -178,18 +196,21 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      // Submit a report for each selected crime
+      // Submit a report for each selected crime with its assigned severity
       List<String> successfulSubmissions = [];
       List<String> failedSubmissions = [];
 
-      for (String crimeType in _selectedCrimes) {
+      for (var crimeData in _selectedCrimesWithSeverity) {
+        final crimeType = crimeData['crime']!;
+        final severity = crimeData['severity']!;
+
         try {
           final result = await CrimeReportService.submitReport(
             title: crimeType, // Use the crime type as title
             description: _descriptionController.text.trim().isEmpty
                 ? null
                 : _descriptionController.text.trim(),
-            severity: _selectedSeverity,
+            severity: severity, // Use the pre-assigned severity
             latitude: lat,
             longitude: lng,
             address: _addressController.text.trim().isEmpty
@@ -263,10 +284,9 @@ class _HomePageState extends State<HomePage> {
     _latitudeController.clear();
     _longitudeController.clear();
     setState(() {
-      _selectedSeverity = 'low';
       _selectedDate = DateTime.now();
       _selectedImage = null;
-      _selectedCrimes.clear(); // Clear selected crimes
+      _selectedCrimesWithSeverity.clear();
     });
   }
 
@@ -435,58 +455,58 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(AppConstants.radiusM),
                     border: Border.all(color: Colors.orange, width: 2),
                   ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.phone_in_talk,
-                        color: Colors.red,
-                        size: 24,
-                      ),
-                      const SizedBox(width: AppConstants.spacingS),
-                      Expanded(
-                        child: Text(
-                          'MAIN HOTLINE - Tap to call the hotline',
-                          style: TextStyle(
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone_in_talk,
                             color: Colors.red,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                            size: 24,
+                          ),
+                          const SizedBox(width: AppConstants.spacingS),
+                          Expanded(
+                            child: Text(
+                              'MAIN HOTLINE - Tap to call the hotline',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppConstants.spacingS),
+                      InkWell(
+                        onTap: () => _makePhoneCall('911', '911 Emergency Hotline'),
+                        child: Container(
+                          padding: const EdgeInsets.all(AppConstants.spacingS),
+                          decoration: BoxDecoration(
+                            color: Constants.background,
+                            borderRadius: BorderRadius.circular(
+                              AppConstants.radiusS,
+                            ),
+                            border: Border.all(color: Colors.red),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.phone, color: Colors.red, size: 20),
+                              const SizedBox(width: AppConstants.spacingS),
+                              Expanded(
+                                child: Text(
+                                  'Call now: 911 (Main Hotline)',
+                                  style: TextStyle(
+                                    color: Constants.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                      const SizedBox(height: AppConstants.spacingS),
-                     InkWell(
-                       onTap: () => _makePhoneCall('911', '911 Emergency Hotline'),
-                       child: Container(
-                         padding: const EdgeInsets.all(AppConstants.spacingS),
-                         decoration: BoxDecoration(
-                           color: Constants.background,
-                           borderRadius: BorderRadius.circular(
-                             AppConstants.radiusS,
-                           ),
-                           border: Border.all(color: Colors.red),
-                         ),
-                         child: Row(
-                           children: [
-                             Icon(Icons.phone, color: Colors.red, size: 20),
-                             const SizedBox(width: AppConstants.spacingS),
-                             Expanded(
-                               child: Text(
-                                 'Call now: 911 (Main Hotline)',
-                                 style: TextStyle(
-                                   color: Constants.textPrimary,
-                                   fontWeight: FontWeight.w600,
-                                 ),
-                               ),
-                             ),
-                           ],
-                         ),
-                       ),
-                     ),
                       const SizedBox(height: AppConstants.spacingXS),
                       Text(
                         '✓ This will show the confirmation dialog',
@@ -847,23 +867,25 @@ class _HomePageState extends State<HomePage> {
     await showDialog(
       context: context,
       builder: (context) => CrimeSelectionModal(
-        selectedCrime: _selectedCrimes.isNotEmpty ? _selectedCrimes.first : null,
-        onCrimesSelected: (selectedCrimes) { // Changed callback
+        selectedCrime: _selectedCrimesWithSeverity.isNotEmpty
+            ? _selectedCrimesWithSeverity.first['crime']
+            : null,
+        onCrimesSelected: (selectedCrimesWithSeverity) {
           setState(() {
-            _selectedCrimes = selectedCrimes;
+            _selectedCrimesWithSeverity = selectedCrimesWithSeverity;
             // Update title controller to show first crime or count
-            if (selectedCrimes.isNotEmpty) {
-              if (selectedCrimes.length == 1) {
-                _titleController.text = selectedCrimes.first;
+            if (selectedCrimesWithSeverity.isNotEmpty) {
+              if (selectedCrimesWithSeverity.length == 1) {
+                _titleController.text = selectedCrimesWithSeverity.first['crime']!;
               } else {
-                _titleController.text = '${selectedCrimes.length} crime types selected';
+                _titleController.text = '${selectedCrimesWithSeverity.length} crime types selected';
               }
             } else {
               _titleController.text = '';
             }
           });
         },
-        selectedSeverity: _selectedSeverity,
+        selectedSeverity: 'low', // This parameter is no longer used but kept for compatibility
       ),
     );
   }
@@ -908,7 +930,7 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Crime Type Selection - Updated for multiple selection
+                  // Crime Type Selection - Updated for multiple selection with severity
                   GestureDetector(
                     onTap: _showCrimeSelectionModal,
                     child: Container(
@@ -918,13 +940,13 @@ class _HomePageState extends State<HomePage> {
                       ),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _selectedCrimes.isEmpty
+                          color: _selectedCrimesWithSeverity.isEmpty
                               ? Constants.greyDark
                               : Constants.primary,
-                          width: _selectedCrimes.isEmpty ? 1 : 2,
+                          width: _selectedCrimesWithSeverity.isEmpty ? 1 : 2,
                         ),
                         borderRadius: BorderRadius.circular(AppConstants.radiusM),
-                        color: _selectedCrimes.isEmpty
+                        color: _selectedCrimesWithSeverity.isEmpty
                             ? Constants.background
                             : Constants.primary.withOpacity(0.05),
                       ),
@@ -932,7 +954,7 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Icon(
                             Icons.report_problem,
-                            color: _selectedCrimes.isEmpty
+                            color: _selectedCrimesWithSeverity.isEmpty
                                 ? Constants.textSecondary
                                 : Constants.primary,
                           ),
@@ -951,50 +973,78 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _selectedCrimes.isEmpty
+                                  _selectedCrimesWithSeverity.isEmpty
                                       ? 'Tap to select crime types'
-                                      : _selectedCrimes.length == 1
-                                          ? _selectedCrimes.first
-                                          : '${_selectedCrimes.length} crime types selected',
+                                      : _selectedCrimesWithSeverity.length == 1
+                                      ? _selectedCrimesWithSeverity.first['crime']!
+                                      : '${_selectedCrimesWithSeverity.length} crime types selected',
                                   style: TextStyle(
-                                    color: _selectedCrimes.isEmpty
+                                    color: _selectedCrimesWithSeverity.isEmpty
                                         ? Constants.textSecondary
                                         : Constants.textPrimary,
                                     fontSize: 16,
-                                    fontWeight: _selectedCrimes.isEmpty
+                                    fontWeight: _selectedCrimesWithSeverity.isEmpty
                                         ? FontWeight.normal
                                         : FontWeight.w500,
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                // Show selected crimes list
-                                if (_selectedCrimes.length > 1) ...[
+                                // Show selected crimes with severity badges
+                                if (_selectedCrimesWithSeverity.length > 1) ...[
                                   const SizedBox(height: AppConstants.spacingS),
                                   Wrap(
                                     spacing: AppConstants.spacingXS,
                                     runSpacing: AppConstants.spacingXS,
-                                    children: _selectedCrimes.take(3).map((crime) {
+                                    children: _selectedCrimesWithSeverity.take(3).map((crimeData) {
+                                      final crime = crimeData['crime']!;
+                                      final severity = crimeData['severity']!;
+                                      final severityColor = _getSeverityColor(severity);
+
                                       return Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: AppConstants.spacingS,
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Constants.primary.withOpacity(0.1),
+                                          color: severityColor.withOpacity(0.2),
                                           borderRadius: BorderRadius.circular(AppConstants.radiusS),
-                                        ),
-                                        child: Text(
-                                          crime.length > 20 ? '${crime.substring(0, 20)}...' : crime,
-                                          style: TextStyle(
-                                            color: Constants.primary,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
+                                          border: Border.all(
+                                            color: severityColor.withOpacity(0.5),
                                           ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              crime.length > 15 ? '${crime.substring(0, 15)}...' : crime,
+                                              style: TextStyle(
+                                                color: severityColor,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: severityColor,
+                                                borderRadius: BorderRadius.circular(3),
+                                              ),
+                                              child: Text(
+                                                _getSeverityLabel(severity)[0],
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       );
                                     }).toList()
-                                      ..addAll(_selectedCrimes.length > 3 ? [
+                                      ..addAll(_selectedCrimesWithSeverity.length > 3 ? [
                                         Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: AppConstants.spacingS,
@@ -1005,7 +1055,7 @@ class _HomePageState extends State<HomePage> {
                                             borderRadius: BorderRadius.circular(AppConstants.radiusS),
                                           ),
                                           child: Text(
-                                            '+${_selectedCrimes.length - 3} more',
+                                            '+${_selectedCrimesWithSeverity.length - 3} more',
                                             style: TextStyle(
                                               color: Constants.primary,
                                               fontSize: 11,
@@ -1030,7 +1080,7 @@ class _HomePageState extends State<HomePage> {
                   ),
 
                   // Add validation helper text
-                  if (_selectedCrimes.isEmpty)
+                  if (_selectedCrimesWithSeverity.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(left: 12, top: 4),
                       child: Text(
@@ -1074,43 +1124,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: AppConstants.spacingM),
 
-                  // Severity Dropdown
-                  DropdownButtonFormField<String>(
-                    value: _selectedSeverity,
-                    style: TextStyle(color: Constants.textPrimary),
-                    dropdownColor: Constants.surface,
-                    decoration: InputDecoration(
-                      labelText: 'Severity',
-                      labelStyle: TextStyle(color: Constants.textSecondary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusM,
-                        ),
-                        borderSide: BorderSide(color: Constants.greyDark),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppConstants.radiusM,
-                        ),
-                        borderSide: BorderSide(color: Constants.greyDark),
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'low', child: Text('Low')),
-                      DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                      DropdownMenuItem(value: 'high', child: Text('High')),
-                      DropdownMenuItem(
-                        value: 'critical',
-                        child: Text('Critical'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedSeverity = value!;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: AppConstants.spacingM),
+                  // REMOVED: Severity Dropdown - Now handled automatically per crime type
+
                   // Location Section with Get Current Location Button
                   Row(
                     children: [
@@ -1125,9 +1140,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       ElevatedButton.icon(
-                        onPressed: _isLoadingLocation
-                            ? null
-                            : _getCurrentLocation,
+                        onPressed: _isLoadingLocation ? null : _getCurrentLocation,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Constants.primary,
                           foregroundColor: Constants.white,
@@ -1139,13 +1152,13 @@ class _HomePageState extends State<HomePage> {
                         ),
                         icon: _isLoadingLocation
                             ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  color: Constants.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Constants.white,
+                            strokeWidth: 2,
+                          ),
+                        )
                             : Icon(Icons.my_location, size: 20),
                         label: Text(
                           _isLoadingLocation ? 'Getting...' : 'Use Current',
@@ -1154,81 +1167,90 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   const SizedBox(height: AppConstants.spacingS),
-                  // Location Fields Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _latitudeController,
-                          style: TextStyle(color: Constants.textPrimary),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Latitude',
-                            labelStyle: TextStyle(
-                              color: Constants.textSecondary,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppConstants.radiusM,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppConstants.radiusM,
-                              ),
-                              borderSide: BorderSide(color: Constants.greyDark),
+
+                  // Location status indicator (kept)
+                  Container(
+                    padding: const EdgeInsets.all(AppConstants.spacingM),
+                    decoration: BoxDecoration(
+                      color: (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+                          ? Constants.success.withOpacity(0.1)
+                          : Constants.error.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(AppConstants.radiusM),
+                      border: Border.all(
+                        color: (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+                            ? Constants.success
+                            : Constants.error,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+                              ? Icons.location_on
+                              : Icons.location_off,
+                          color: (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+                              ? Constants.success
+                              : Constants.error,
+                          size: 20,
+                        ),
+                        const SizedBox(width: AppConstants.spacingS),
+                        Expanded(
+                          child: Text(
+                            (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+                                ? 'Location coordinates obtained'
+                                : 'Location needed — tap "Use Current"',
+                            style: TextStyle(
+                              color: (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+                                  ? Constants.success
+                                  : Constants.error,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Hidden latitude/longitude fields WITH validators (kept in form, not visible)
+                  Visibility(
+                    visible: false,
+                    maintainState: true,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _latitudeController,
+                          readOnly: true,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Required';
+                              return 'Latitude is required';
                             }
-                            double? lat = double.tryParse(value);
+                            final lat = double.tryParse(value);
                             if (lat == null || lat < -90 || lat > 90) {
                               return 'Invalid latitude';
                             }
                             return null;
                           },
                         ),
-                      ),
-                      const SizedBox(width: AppConstants.spacingM),
-                      Expanded(
-                        child: TextFormField(
+                        TextFormField(
                           controller: _longitudeController,
-                          style: TextStyle(color: Constants.textPrimary),
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Longitude',
-                            labelStyle: TextStyle(
-                              color: Constants.textSecondary,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppConstants.radiusM,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppConstants.radiusM,
-                              ),
-                              borderSide: BorderSide(color: Constants.greyDark),
-                            ),
-                          ),
+                          readOnly: true,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Required';
+                              return 'Longitude is required';
                             }
-                            double? lng = double.tryParse(value);
+                            final lng = double.tryParse(value);
                             if (lng == null || lng < -180 || lng > 180) {
                               return 'Invalid longitude';
                             }
                             return null;
                           },
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+
                   const SizedBox(height: AppConstants.spacingM),
+
                   // Address Field
                   TextFormField(
                     controller: _addressController,
@@ -1332,29 +1354,29 @@ class _HomePageState extends State<HomePage> {
                       ),
                       child: _isSubmitting
                           ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Constants.white,
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                const SizedBox(width: AppConstants.spacingS),
-                                Text('Submitting ${_selectedCrimes.length} Report${_selectedCrimes.length == 1 ? '' : 's'}...'),
-                              ],
-                            )
-                          : Text(
-                              _selectedCrimes.length <= 1
-                                  ? 'Submit Report'
-                                  : 'Submit ${_selectedCrimes.length} Reports',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Constants.white,
+                              strokeWidth: 2,
                             ),
+                          ),
+                          const SizedBox(width: AppConstants.spacingS),
+                          Text('Submitting ${_selectedCrimesWithSeverity.length} Report${_selectedCrimesWithSeverity.length == 1 ? '' : 's'}...'),
+                        ],
+                      )
+                          : Text(
+                        _selectedCrimesWithSeverity.length <= 1
+                            ? 'Submit Report'
+                            : 'Submit ${_selectedCrimesWithSeverity.length} Reports',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1388,3 +1410,4 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 }
+
