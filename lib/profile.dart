@@ -608,6 +608,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
+      case 'critical':
+        return Constants.error;
       case 'high':
         return Constants.error;
       case 'medium':
@@ -656,7 +658,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 dropdownColor: Constants.surface,
                 style: TextStyle(color: Constants.textPrimary),
-                items: ['high', 'medium', 'low'].map((severity) {
+                items: ['critical', 'high', 'medium', 'low'].map((severity) {
                   return DropdownMenuItem(
                     value: severity,
                     child: Text(severity.toUpperCase()),
@@ -678,13 +680,24 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 dropdownColor: Constants.surface,
                 style: TextStyle(color: Constants.textPrimary),
-                items: ['pending', 'investigating', 'resolved', 'closed']
-                    .map((status) {
-                  return DropdownMenuItem(
-                    value: status,
-                    child: Text(status.toUpperCase()),
-                  );
-                }).toList(),
+                items: [
+                  DropdownMenuItem(
+                    value: 'pending',
+                    child: Text('PENDING'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'investigating',
+                    child: Text('UNDER INVESTIGATION'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'resolved',
+                    child: Text('RESOLVED'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'closed',
+                    child: Text('CLOSED'),
+                  ),
+                ],
                 onChanged: (value) {
                   setState(() {
                     selectedStatus = value;
