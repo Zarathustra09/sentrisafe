@@ -11,6 +11,7 @@ import '../models/saved_route_model.dart';
 import '../models/crime_report_model.dart';
 import '../services/route_database_helper.dart';
 import '../services/crime_report/crime_report_service.dart';
+import '../services/maps/map_service.dart';
 import '../widgets/save_route_dialog.dart';
 import '../widgets/saved_routes_dialog.dart';
 
@@ -150,6 +151,10 @@ class _MapPageState extends State<MapPage> {
   String? _currentDuration;
   String? _currentDistance;
   bool _isCurrentRouteSafer = false;
+
+  // Add these variables to store selected coordinates
+  LatLng? _selectedFromCoordinates;
+  LatLng? _selectedToCoordinates;
 
   static const String apiKey = googleApiKey;
 
@@ -449,33 +454,12 @@ class _MapPageState extends State<MapPage> {
 
   Future<LatLng?> _getCoordinatesFromText(String text) async {
     try {
-      // Prefer Google Geocoding API restricted/bounded to Tanauan
-      final url =
-          'https://maps.googleapis.com/maps/api/geocode/json?'
-          'address=${Uri.encodeComponent('$text, Tanauan, Batangas, Philippines')}&'
-          'key=$apiKey&'
-          'components=country:PH&'
-          'bounds=${MapConstants.tanauanSouth},${MapConstants.tanauanWest}|'
-          '${MapConstants.tanauanNorth},${MapConstants.tanauanEast}';
-
-      final resp = await http.get(Uri.parse(url));
-      if (resp.statusCode == 200) {
-        final data = json.decode(resp.body);
-        if (data['results'] != null &&
-            data['results'] is List &&
-            data['results'].isNotEmpty) {
-          final loc = data['results'][0]['geometry']['location'];
-          final latLng = LatLng(
-            (loc['lat'] as num).toDouble(),
-            (loc['lng'] as num).toDouble(),
-          );
-          return _clampToTanauan(latLng);
-        }
-      }
+      // Use the Laravel API endpoint instead of direct Google API call
+      return await MapService.getCoordinatesFromText(text);
     } catch (e) {
       print('Error geocoding address: $e');
+      return null;
     }
-    return null;
   }
 
   Future<void> _searchAndNavigate() async {
@@ -493,8 +477,18 @@ class _MapPageState extends State<MapPage> {
 
     try {
       print('Getting coordinates...');
-      LatLng? from = await _getCoordinatesFromText(_fromController.text);
-      LatLng? to = await _getCoordinatesFromText(_toController.text);
+
+      // Use stored coordinates if available, otherwise geocode
+      LatLng? from = _selectedFromCoordinates;
+      LatLng? to = _selectedToCoordinates;
+
+      // Only geocode if coordinates weren't stored from place selection
+      if (from == null) {
+        from = await _getCoordinatesFromText(_fromController.text);
+      }
+      if (to == null) {
+        to = await _getCoordinatesFromText(_toController.text);
+      }
 
       print('From coordinates: $from');
       print('To coordinates: $to');
@@ -534,8 +528,18 @@ class _MapPageState extends State<MapPage> {
 
     try {
       print('Getting coordinates for safer route...');
-      LatLng? from = await _getCoordinatesFromText(_fromController.text);
-      LatLng? to = await _getCoordinatesFromText(_toController.text);
+
+      // Use stored coordinates if available, otherwise geocode
+      LatLng? from = _selectedFromCoordinates;
+      LatLng? to = _selectedToCoordinates;
+
+      // Only geocode if coordinates weren't stored from place selection
+      if (from == null) {
+        from = await _getCoordinatesFromText(_fromController.text);
+      }
+      if (to == null) {
+        to = await _getCoordinatesFromText(_toController.text);
+      }
 
       print('From coordinates: $from');
       print('To coordinates: $to');
@@ -651,13 +655,26 @@ class _MapPageState extends State<MapPage> {
           );
         }
       } else if (response.statusCode == 422) {
-        // Handle validation errors
+        // Handle validation errors including bounds check
         final data = json.decode(response.body);
         String message = data['message'] ?? 'Invalid request parameters';
-        print('Validation error: $message');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+
+        // Check if it's a bounds error
+        if (message.contains('Tanauan City')) {
+          print('Bounds validation error: $message');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Constants.error,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        } else {
+          print('Validation error: $message');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        }
       } else {
         print('HTTP error: ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -667,7 +684,10 @@ class _MapPageState extends State<MapPage> {
     } catch (e) {
       print('Error getting safer route: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error getting safer route: $e')),
+        SnackBar(
+          content: Text('Error getting safer route: $e'),
+          backgroundColor: Constants.error,
+        ),
       );
     }
   }
@@ -928,102 +948,92 @@ class _MapPageState extends State<MapPage> {
   Future<void> _getDirections(LatLng from, LatLng to) async {
     print('Getting directions from $from to $to');
 
-    // Use the Roads API or Routes API instead of the legacy Directions API
-    final String url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-
-    final Map<String, dynamic> requestBody = {
-      "origin": {
-        "location": {
-          "latLng": {
-            "latitude": from.latitude,
-            "longitude": from.longitude
-          }
-        }
-      },
-      "destination": {
-        "location": {
-          "latLng": {
-            "latitude": to.latitude,
-            "longitude": to.longitude
-          }
-        }
-      },
-      "travelMode": "DRIVE",
-      "routingPreference": "TRAFFIC_AWARE",
-      "computeAlternativeRoutes": false,
-      "routeModifiers": {
-        "avoidTolls": false,
-        "avoidHighways": false,
-        "avoidFerries": false
-      },
-      "languageCode": "en-US",
-      "units": "IMPERIAL"
-    };
-
     try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline'
-        },
-        body: json.encode(requestBody),
+      // Use the Laravel API endpoint instead of direct Google Routes API call
+      final data = await MapService.getDirections(
+        fromLat: from.latitude,
+        fromLng: from.longitude,
+        toLat: to.latitude,
+        toLng: to.longitude,
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_AWARE',
+        units: 'IMPERIAL',
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print('Response data: $data');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      // Check for bounds validation errors
+      if (data['success'] == false && data['error_type'] != null) {
+        final errorType = data['error_type'];
+        final message = data['message'] ?? 'Location out of bounds';
 
-        if (data['routes'] != null && data['routes'].isNotEmpty) {
-          final route = data['routes'][0];
-          final polylinePoints = route['polyline']['encodedPolyline'];
-          final duration = route['duration'] ?? '';
-          final distanceMeters = route['distanceMeters'] ?? 0;
-          final distance = '${(distanceMeters / 1609.34).toStringAsFixed(1)} mi'; // Convert meters to miles
+        print('Bounds validation error: $errorType - $message');
 
-          print('Route found, updating map');
-
-          setState(() {
-            _currentSaferRoute = null; // Clear safer route info when showing regular route
-            _isCurrentRouteSafer = false;
-            _currentFromLocation = from;
-            _currentToLocation = to;
-            _currentPolyline = polylinePoints;
-            _currentDuration = duration;
-            _currentDistance = distance;
-
-            _polylines = {
-              Polyline(
-                polylineId: const PolylineId('route'),
-                points: _decodePolyline(polylinePoints),
-                color: Constants.primary,
-                width: 4,
-              ),
-            };
-          });
-
-          _updateMapMarkers();
-          _fitMapToRoute(from, to);
-          print('Map updated successfully');
-        } else {
-          print('No routes found');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No route found')),
-          );
+        // Show specific error message based on error type
+        String userMessage = message;
+        if (errorType == 'origin_out_of_bounds') {
+          userMessage = 'Starting location must be within Tanauan City, Batangas';
+        } else if (errorType == 'destination_out_of_bounds') {
+          userMessage = 'Destination must be within Tanauan City, Batangas';
         }
-      } else {
-        print('HTTP error: ${response.statusCode}');
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Server error: ${response.statusCode}')),
+          SnackBar(
+            content: Text(userMessage),
+            backgroundColor: Constants.error,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (data['success'] == true && data['polyline'] != null) {
+        final polylinePoints = data['polyline'];
+        final duration = data['duration'] ?? '';
+        final distance = data['distance'] ?? '';
+
+        print('Route found, updating map');
+
+        setState(() {
+          _currentSaferRoute = null;
+          _isCurrentRouteSafer = false;
+          _currentFromLocation = from;
+          _currentToLocation = to;
+          _currentPolyline = polylinePoints;
+          _currentDuration = duration;
+          _currentDistance = distance;
+
+          _polylines = {
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: _decodePolyline(polylinePoints),
+              color: Constants.primary,
+              width: 4,
+            ),
+          };
+        });
+
+        _updateMapMarkers();
+        _fitMapToRoute(from, to);
+        print('Map updated successfully');
+      } else {
+        print('No routes found');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No route found')),
         );
       }
     } catch (e) {
       print('Error getting directions: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error getting directions: $e')),
+        SnackBar(
+          content: Text('Error getting directions: $e'),
+          backgroundColor: Constants.error,
+        ),
       );
     }
   }
@@ -1171,22 +1181,22 @@ class _MapPageState extends State<MapPage> {
           permission == LocationPermission.always) {
         Position position = await Geolocator.getCurrentPosition();
         final currentPos = LatLng(position.latitude, position.longitude);
-        final clampedPos = _clampToTanauan(currentPos);
 
         // Get readable address
-        final address = await _getAddressFromCoordinates(clampedPos);
+        final address = await _getAddressFromCoordinates(currentPos);
 
         setState(() {
-          _currentLocation = clampedPos;
+          _currentLocation = currentPos;
+          _selectedFromCoordinates = currentPos; // Store the coordinates
           _fromController.text = address ??
-              'Current Location (${clampedPos.latitude.toStringAsFixed(4)}, ${clampedPos.longitude.toStringAsFixed(4)})';
+              'Current Location (${currentPos.latitude.toStringAsFixed(4)}, ${currentPos.longitude.toStringAsFixed(4)})';
         });
 
         // Move map to current location
         if (_mapController != null) {
           _mapController!.animateCamera(
             CameraUpdate.newCameraPosition(
-              CameraPosition(target: clampedPos, zoom: 16.0),
+              CameraPosition(target: currentPos, zoom: 16.0),
             ),
           );
         }
@@ -1256,23 +1266,14 @@ class _MapPageState extends State<MapPage> {
       double latPadding = (maxLat - minLat) * 0.1;
       double lngPadding = (maxLng - minLng) * 0.1;
 
-      // Clamp to Tanauan bounds
-      double south = (minLat - latPadding)
-          .clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth)
-          .toDouble();
-      double north = (maxLat + latPadding)
-          .clamp(MapConstants.tanauanSouth, MapConstants.tanauanNorth)
-          .toDouble();
-      double west = (minLng - lngPadding)
-          .clamp(MapConstants.tanauanWest, MapConstants.tanauanEast)
-          .toDouble();
-      double east = (maxLng + lngPadding)
-          .clamp(MapConstants.tanauanWest, MapConstants.tanauanEast)
-          .toDouble();
+      double south = minLat - latPadding;
+      double north = maxLat + latPadding;
+      double west = minLng - lngPadding;
+      double east = maxLng + lngPadding;
 
       try {
         if (south >= north || west >= east) {
-          throw Exception('Invalid bounds after clamping');
+          throw Exception('Invalid bounds');
         }
         _mapController!.animateCamera(
           CameraUpdate.newLatLngBounds(
@@ -1287,7 +1288,10 @@ class _MapPageState extends State<MapPage> {
         print('Error fitting map to route: $e');
         _mapController!.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: _tanauanCenter, zoom: 13.0),
+            CameraPosition(
+              target: LatLng(MapConstants.tanauanCenterLat, MapConstants.tanauanCenterLng),
+              zoom: 13.0,
+            ),
           ),
         );
       }
@@ -1298,6 +1302,7 @@ class _MapPageState extends State<MapPage> {
     required TextEditingController controller,
     required String labelText,
     required IconData prefixIcon,
+    required bool isFromField,
   }) {
     return TypeAheadField<PlaceSuggestion>(
       controller: controller,
@@ -1305,6 +1310,16 @@ class _MapPageState extends State<MapPage> {
         return TextField(
           controller: controller,
           focusNode: focusNode,
+          onChanged: (value) {
+            // Clear stored coordinates when user manually types
+            setState(() {
+              if (isFromField) {
+                _selectedFromCoordinates = null;
+              } else {
+                _selectedToCoordinates = null;
+              }
+            });
+          },
           decoration: InputDecoration(
             labelText: labelText,
             labelStyle: TextStyle(color: Constants.textSecondary),
@@ -1346,12 +1361,26 @@ class _MapPageState extends State<MapPage> {
       onSelected: (PlaceSuggestion suggestion) async {
         controller.text = suggestion.description;
         LatLng? coordinates = await _getPlaceDetails(suggestion.placeId);
-        if (coordinates != null && _mapController != null) {
-          _mapController!.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(target: coordinates, zoom: 15.0),
-            ),
-          );
+        if (coordinates != null) {
+          // Store the coordinates based on which field was selected
+          setState(() {
+            if (isFromField) {
+              _selectedFromCoordinates = coordinates;
+              print('Stored FROM coordinates: $coordinates');
+            } else {
+              _selectedToCoordinates = coordinates;
+              print('Stored TO coordinates: $coordinates');
+            }
+          });
+
+          // Move camera to the selected location
+          if (_mapController != null) {
+            _mapController!.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(target: coordinates, zoom: 15.0),
+              ),
+            );
+          }
         }
       },
       decorationBuilder: (context, child) {
@@ -1421,6 +1450,7 @@ class _MapPageState extends State<MapPage> {
                         controller: _fromController,
                         labelText: "From",
                         prefixIcon: Icons.my_location,
+                        isFromField: true,
                       ),
                     ),
                     const SizedBox(width: AppConstants.spacingS),
@@ -1449,6 +1479,7 @@ class _MapPageState extends State<MapPage> {
                   controller: _toController,
                   labelText: "To",
                   prefixIcon: Icons.location_on,
+                  isFromField: false,
                 ),
                 const SizedBox(height: AppConstants.spacingS),
 
